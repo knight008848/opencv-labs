@@ -1,9 +1,8 @@
-# Force LF line endings for all text files — avoids CRLF/LF conflicts
-# between Linux VM (this repo's writer) and Windows/WSL (reader).
+# Force LF line endings for all text files.
+# Stops CRLF/LF conflicts between Linux VM and Windows/WSL.
+* text eol=lf
 
-* text=auto eol=lf
-
-# Binary files — do not modify
+# Binary files — never modify
 *.png binary
 *.jpg binary
 *.jpeg binary
