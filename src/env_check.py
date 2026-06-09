@@ -250,13 +250,17 @@ except Exception as e:
 
 # --- OpenCL (Intel/AMD fallback) ---
 try:
-    dev = cv2.ocl.Device.getDefault()
-    if dev is not None:
-        check("OpenCL device", True, str(dev.name()))
+    ocl_available = cv2.ocl.haveOpenCL()
+    if ocl_available:
+        dev = cv2.ocl.Device.getDefault()
+        if dev is not None and dev.name():
+            check("OpenCL device", True, str(dev.name()))
+        else:
+            check("OpenCL device", False, "haveOpenCL()=True but no valid device")
     else:
-        check("OpenCL", False, "No OpenCL devices found")
+        check("OpenCL device", False, "No OpenCL runtime found (haveOpenCL()=False)")
 except Exception:
-    check("OpenCL", False, "OpenCL not available")
+    check("OpenCL device", False, "OpenCL not available")
 
 
 # ============================================================
@@ -280,51 +284,4 @@ print()
 print(SEP)
 print("  Environment check complete.")
 print(SEP)
-    pt_ver = torch.__version__
-    pt_cuda = torch.cuda.is_available()
-    if pt_cuda:
-        pt_dev = torch.cuda.device_count()
-        pt_name = torch.cuda.get_device_name(0)
-        pt_mem = torch.cuda.get_device_properties(0).total_mem
-        detail = "CUDA available: %dx %s, %.1f GB" % (
-            pt_dev, pt_name, pt_mem / 1024**3)
-        check("PyTorch " + pt_ver, True, detail)
-    else:
-        check("PyTorch " + pt_ver, True, "CUDA NOT available (CPU only)")
-except ImportError:
-    print("  [ -- ] PyTorch: not installed (optional, not required)")
-except Exception as e:
-    check("PyTorch", False, str(e))
-
-# --- OpenCL (Intel/AMD fallback) ---
-try:
-    dev = cv2.ocl.Device.getDefault()
-    if dev is not None:
-        check("OpenCL device", True, str(dev.name()))
-    else:
-        check("OpenCL", False, "No OpenCL devices found")
-except Exception:
-    check("OpenCL", False, "OpenCL not available")
-
-
-# ============================================================
-# 6. Summary
-# ============================================================
-header("6. Summary")
-
-all_ok = core_ok
-print("  Core libraries:  %s" % ("ALL OK" if all_ok else "SOME MISSING"))
-print("  GUI (imshow):    %s" % ("Available" if gui_ok else "HEADLESS - use matplotlib"))
-print("  Video (MP4):     %s" % ("Decoding OK" if hevc_ok else "Not tested / failed"))
-print("  Matplotlib:      %s" % ("Ready" if mpl_ok else "Not available"))
-
-if not gui_ok:
-    print()
-    print("  NOTE: This environment is headless (no imshow).")
-    print("    Use matplotlib.pyplot.imshow() for image display.")
-    print("    Use for-loops + savefig() instead of Trackbar interaction.")
-
-print()
-print(SEP)
-print("  Environment check complete.")
-print(SEP)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
