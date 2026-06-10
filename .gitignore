@@ -43,3 +43,7 @@ models/*.pt
 
 # Conda
 .python-version
+posts
+
+# Blog posts
+_posts/
