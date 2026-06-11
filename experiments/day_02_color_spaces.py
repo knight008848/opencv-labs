@@ -4,13 +4,12 @@ Date: 2026-06-11
 Goal: Understand color space conversion and saturation/color measurement
 Runtime: ~5 min
 """
-from pathlib import Path
+
 import sys
+from pathlib import Path
 
 import cv2
 import matplotlib.pyplot as plt
-import numpy as np
-
 
 
 def main():
@@ -27,8 +26,8 @@ def main():
         print(f"file size (original JPG): {frame_path.stat().st_size:,} bytes")
 
         # --- Conversions ---
-        img_rgb  = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        img_hsv  = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img_hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
         img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
         # =====================================================================
@@ -70,9 +69,9 @@ def main():
         # Task 2: Pseudo-color — 3 colormaps on the grayscale image
         # =====================================================================
         colormaps = [
-            (cv2.COLORMAP_JET,    "JET",    "blue→cyan→yellow→red"),
-            (cv2.COLORMAP_HOT,    "HOT",    "black→red→yellow→white"),
-            (cv2.COLORMAP_BONE,   "BONE",   "black→white (blue tint)"),
+            (cv2.COLORMAP_JET, "JET", "blue→cyan→yellow→red"),
+            (cv2.COLORMAP_HOT, "HOT", "black→red→yellow→white"),
+            (cv2.COLORMAP_BONE, "BONE", "black→white (blue tint)"),
         ]
 
         colored = {}
@@ -103,7 +102,7 @@ def main():
         # =====================================================================
         # Task 3: File size reduction from BGR to Gray
         # =====================================================================
-        bgr_path  = result_dir / "_tmp_bgr.jpg"
+        bgr_path = result_dir / "_tmp_bgr.jpg"
         gray_path = result_dir / "_tmp_gray.jpg"
         cv2.imwrite(str(bgr_path), img)
         cv2.imwrite(str(gray_path), img_gray)
@@ -111,11 +110,11 @@ def main():
         if not bgr_path.exists() or not gray_path.exists():
             print("Warning: failed to write temp files for size comparison")
         else:
-            size_bgr  = bgr_path.stat().st_size
+            size_bgr = bgr_path.stat().st_size
             size_gray = gray_path.stat().st_size
             reduction = (1 - size_gray / size_bgr) * 100
 
-            print(f"\n--- File Size Comparison ---")
+            print("\n--- File Size Comparison ---")
             print(f"  BGR  (3 channels): {size_bgr:>8,} bytes")
             print(f"  Gray (1 channel):  {size_gray:>8,} bytes")
             print(f"  Reduction:         {reduction:>7.1f}%")

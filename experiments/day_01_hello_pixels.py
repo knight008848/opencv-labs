@@ -4,12 +4,12 @@ Date: 2026-06-10
 Goal: Read a video, extract a single frame, inspect its matrix properties
 Runtime: ~15 min
 """
+
 import sys
 from pathlib import Path
 
 import cv2
 import numpy as np
-
 
 
 def main():
@@ -40,12 +40,11 @@ def main():
         print("Error: Could not read frame 1008")
         sys.exit(1)
 
-
     # --- Exercise 1: explore shape, dtype, pixel access, mean values ---
     img = cv2.imread(str(frame_path))
-    print(f"shape:  {img.shape}")      # (高, 宽, 通道数)
-    print(f"dtype:  {img.dtype}")      # uint8
-    print(f"总像素数: {img.size}")      # 高×宽×3
+    print(f"shape:  {img.shape}")  # (高, 宽, 通道数)
+    print(f"dtype:  {img.dtype}")  # uint8
+    print(f"总像素数: {img.size}")  # 高×宽×3
 
     print(f"文件大小: {frame_path.stat().st_size} bytes")
 
@@ -58,22 +57,21 @@ def main():
     mean_b, mean_g, mean_r = np.mean(img, axis=(0, 1))
     print(f"BGR 各通道均值: B={mean_b:.1f} G={mean_g:.1f} R={mean_r:.1f}")
 
-
     # --- Exercise 2: find the brightest pixel ---
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     y, x = np.unravel_index(np.argmax(gray), gray.shape)
     b, g, r = img[y, x]
-    print(f" brightest pixel @ [{y}, {x}]  gray={gray[y,x]}  BGR=({b}, {g}, {r})")
+    print(f" brightest pixel @ [{y}, {x}]  gray={gray[y, x]}  BGR=({b}, {g}, {r})")
 
     # --- top-5 brightest pixels ---
     gray_flat = gray.ravel()
-    top5_idx = np.argpartition(gray_flat, -5)[-5:]              # partition: smallest 5 to the left
+    top5_idx = np.argpartition(gray_flat, -5)[-5:]  # partition: smallest 5 to the left
     top5_idx = top5_idx[np.argsort(gray_flat[top5_idx])[::-1]]  # sort descending
     ys, xs = np.unravel_index(top5_idx, gray.shape)
     print(" top-5 brightest pixels:")
     for i, (yi, xi) in enumerate(zip(ys, xs), 1):
         b, g, r = img[yi, xi]
-        print(f"   {i}. [{yi:4d}, {xi:4d}]  gray={gray[yi,xi]:3d}  BGR=({b}, {g}, {r})")
+        print(f"   {i}. [{yi:4d}, {xi:4d}]  gray={gray[yi, xi]:3d}  BGR=({b}, {g}, {r})")
 
     # --- Exercise 3: watermark at bottom-right corner ---
     text = "OpenCV Day 01"
@@ -81,7 +79,7 @@ def main():
     pos = (w - 400, h - 30)  # bottom-right, offset for text width
     cv2.putText(img, text, pos, cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 255), 3)
     cv2.imwrite(str(frame_path.with_stem("0500_watermarked")), img)
-    print(f" watermarked image saved")
+    print(" watermarked image saved")
 
 
 if __name__ == "__main__":

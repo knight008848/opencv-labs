@@ -15,10 +15,10 @@ Checks:
     6. GPU: OpenCV CUDA, PyTorch CUDA, OpenCL
     7. Summary
 """
-import sys
+
 import os
+import sys
 import time
-import warnings
 from pathlib import Path
 
 PASS = "PASS"
@@ -45,18 +45,20 @@ def check(name, result, detail=""):
 # ============================================================
 header("1. Python & Core Libraries")
 
-py_ok = check("Python %s" % sys.version.split()[0],
-              sys.version_info >= (3, 9),
-              "path: %s" % sys.executable)
+py_ok = check(
+    "Python %s" % sys.version.split()[0], sys.version_info >= (3, 9), "path: %s" % sys.executable
+)
 
 try:
     import numpy as np
+
     np_ok = check("NumPy %s" % np.__version__, True)
 except ImportError:
     np_ok = check("NumPy", False, "pip install numpy")
 
 try:
     import cv2
+
     cv_ver = cv2.__version__
     cv_ok = check("OpenCV %s" % cv_ver, True)
 except ImportError:
@@ -65,12 +67,14 @@ except ImportError:
 
 try:
     import matplotlib
+
     mpl_ok = check("Matplotlib %s" % matplotlib.__version__, True)
 except ImportError:
     mpl_ok = check("Matplotlib", False, "pip install matplotlib")
 
 try:
     from PIL import Image
+
     pil_ok = check("Pillow %s" % Image.__version__, True)
 except ImportError:
     pil_ok = check("Pillow", False, "pip install Pillow")
@@ -97,8 +101,7 @@ try:
     gui_ok = True
     check("imshow / waitKey", True)
 except cv2.error:
-    check("imshow / waitKey", False,
-          "GUI not available (headless build). Use matplotlib instead.")
+    check("imshow / waitKey", False, "GUI not available (headless build). Use matplotlib instead.")
 
 # --- Trackbar ---
 if gui_ok:
@@ -119,9 +122,8 @@ else:
     check("Mouse callback", False, "Will use hardcoded coordinates")
 
 # --- Video: backend ---
-has_videoio = hasattr(cv2, 'VideoCapture')
-check("VideoCapture module", has_videoio,
-      "videoio available" if has_videoio else "missing")
+has_videoio = hasattr(cv2, "VideoCapture")
+check("VideoCapture module", has_videoio, "videoio available" if has_videoio else "missing")
 
 # --- Video: HEVC MP4 ---
 hevc_ok = False
@@ -134,15 +136,17 @@ if mp4_files:
     cap.release()
     hevc_ok = ret
     size_mb = os.path.getsize(f) / 1024 / 1024
-    check("Video file read (%s)" % mp4_files[0].name, ret,
-          "%.0f MB" % size_mb if ret else "decode failed")
+    check(
+        "Video file read (%s)" % mp4_files[0].name,
+        ret,
+        "%.0f MB" % size_mb if ret else "decode failed",
+    )
 else:
-    check("Video file test", False,
-          "No mp4 found in %s" % video_dir)
+    check("Video file test", False, "No mp4 found in %s" % video_dir)
 
 # --- VideoWriter ---
 try:
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     img = np.zeros((100, 100, 3), dtype=np.uint8)
     out = cv2.VideoWriter("/tmp/_env_test.mp4", fourcc, 1, (100, 100))
     out.write(img)
@@ -154,8 +158,7 @@ except Exception:
 # --- putText / font ---
 try:
     img = np.zeros((50, 200, 3), dtype=np.uint8)
-    cv2.putText(img, "Test", (5, 30), cv2.FONT_HERSHEY_SIMPLEX,
-                0.5, (255, 255, 255), 1)
+    cv2.putText(img, "Test", (5, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
     check("putText / font rendering", True)
 except Exception:
     check("putText / font rendering", False)
@@ -169,11 +172,9 @@ header("3. File System")
 project_root = Path(__file__).resolve().parent.parent
 check("project_root", project_root.exists(), str(project_root))
 
-for sub in ["data/raw", "data/processed", "experiments",
-            "notebooks", "docs", "src"]:
+for sub in ["data/raw", "data/processed", "experiments", "notebooks", "docs", "src"]:
     p = project_root / sub
-    check("  %s/" % sub, p.exists(),
-          "found" if p.exists() else "create it with mkdir")
+    check("  %s/" % sub, p.exists(), "found" if p.exists() else "create it with mkdir")
 
 
 # ============================================================
@@ -220,8 +221,7 @@ try:
             info = cv2.cuda.DeviceInfo()
             mem_mb = info.totalMemory() / 1024 / 1024
             cc = "%d.%d" % (info.majorVersion(), info.minorVersion())
-            check("  GPU %d: %s" % (i, info.name()), True,
-                  "CC %s, %.0f MB" % (cc, mem_mb))
+            check("  GPU %d: %s" % (i, info.name()), True, "CC %s, %.0f MB" % (cc, mem_mb))
     else:
         check("OpenCV CUDA", False, "No CUDA devices or OpenCV built without CUDA")
 except cv2.error:
@@ -232,14 +232,14 @@ except Exception as e:
 # --- PyTorch (optional) ---
 try:
     import torch
+
     pt_ver = torch.__version__
     pt_cuda = torch.cuda.is_available()
     if pt_cuda:
         pt_dev = torch.cuda.device_count()
         pt_name = torch.cuda.get_device_name(0)
         pt_mem = torch.cuda.get_device_properties(0).total_mem
-        detail = "CUDA available: %dx %s, %.1f GB" % (
-            pt_dev, pt_name, pt_mem / 1024**3)
+        detail = "CUDA available: %dx %s, %.1f GB" % (pt_dev, pt_name, pt_mem / 1024**3)
         check("PyTorch " + pt_ver, True, detail)
     else:
         check("PyTorch " + pt_ver, True, "CUDA NOT available (CPU only)")

@@ -1,12 +1,14 @@
 """
 Shared utilities for opencv-labs experiments.
 """
-import cv2
-import numpy as np
-from pathlib import Path
+
 import time
 from functools import wraps
-from typing import Tuple, Optional, List
+from pathlib import Path
+from typing import List, Optional, Tuple
+
+import cv2
+import numpy as np
 
 
 # --- Path utilities ---
@@ -37,8 +39,9 @@ def save_image(img: np.ndarray, path: str) -> bool:
 
 
 # --- Image preprocessing ---
-def resize_keep_aspect(img: np.ndarray, target_size: int,
-                       pad_color: Tuple[int, int, int] = (0, 0, 0)) -> np.ndarray:
+def resize_keep_aspect(
+    img: np.ndarray, target_size: int, pad_color: Tuple[int, int, int] = (0, 0, 0)
+) -> np.ndarray:
     """Resize image to target_size x target_size, preserving aspect ratio with padding."""
     h, w = img.shape[:2]
     scale = target_size / max(h, w)
@@ -48,14 +51,16 @@ def resize_keep_aspect(img: np.ndarray, target_size: int,
     canvas = np.full((target_size, target_size, 3), pad_color, dtype=np.uint8)
     y_offset = (target_size - new_h) // 2
     x_offset = (target_size - new_w) // 2
-    canvas[y_offset:y_offset+new_h, x_offset:x_offset+new_w] = resized
+    canvas[y_offset : y_offset + new_h, x_offset : x_offset + new_w] = resized
 
     return canvas
 
 
-def standardize_for_model(img: np.ndarray,
-                          mean: Tuple[float, ...] = (0.485, 0.456, 0.406),
-                          std: Tuple[float, ...] = (0.229, 0.224, 0.225)) -> np.ndarray:
+def standardize_for_model(
+    img: np.ndarray,
+    mean: Tuple[float, ...] = (0.485, 0.456, 0.406),
+    std: Tuple[float, ...] = (0.229, 0.224, 0.225),
+) -> np.ndarray:
     """Standardize an RGB image for model input (ImageNet stats)."""
     img = img.astype(np.float32) / 255.0
     img = (img - np.array(mean)) / np.array(std)
@@ -63,19 +68,26 @@ def standardize_for_model(img: np.ndarray,
 
 
 # --- Visualization ---
-def draw_labeled_bbox(img: np.ndarray, bbox: Tuple[int, int, int, int],
-                      label: str, color: Tuple[int, int, int] = (0, 255, 0),
-                      thickness: int = 2) -> np.ndarray:
+def draw_labeled_bbox(
+    img: np.ndarray,
+    bbox: Tuple[int, int, int, int],
+    label: str,
+    color: Tuple[int, int, int] = (0, 255, 0),
+    thickness: int = 2,
+) -> np.ndarray:
     """Draw a bounding box with a text label."""
     x, y, w, h = bbox
-    cv2.rectangle(img, (x, y), (x+w, y+h), color, thickness)
-    cv2.putText(img, label, (x, y-5), cv2.FONT_HERSHEY_SIMPLEX,
-                0.5, color, 1)
+    cv2.rectangle(img, (x, y), (x + w, y + h), color, thickness)
+    cv2.putText(img, label, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
     return img
 
 
-def create_comparison_grid(images: List[np.ndarray], labels: List[str],
-                           cols: int = 3, cell_size: Tuple[int, int] = (300, 200)) -> np.ndarray:
+def create_comparison_grid(
+    images: List[np.ndarray],
+    labels: List[str],
+    cols: int = 3,
+    cell_size: Tuple[int, int] = (300, 200),
+) -> np.ndarray:
     """Create a grid of images with labels for comparison."""
     n = len(images)
     rows = (n + cols - 1) // cols
@@ -89,11 +101,12 @@ def create_comparison_grid(images: List[np.ndarray], labels: List[str],
 
         # Resize image to fit cell
         resized = cv2.resize(img, (cell_size[0] - 10, cell_size[1] - 30))
-        grid[y+5:y+5+resized.shape[0], x+5:x+5+resized.shape[1]] = resized
+        grid[y + 5 : y + 5 + resized.shape[0], x + 5 : x + 5 + resized.shape[1]] = resized
 
         # Add label
-        cv2.putText(grid, label, (x+5, y+cell_size[1]-5),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
+        cv2.putText(
+            grid, label, (x + 5, y + cell_size[1] - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1
+        )
 
     return grid
 
@@ -101,13 +114,15 @@ def create_comparison_grid(images: List[np.ndarray], labels: List[str],
 # --- Performance ---
 def time_it(func):
     """Decorator to measure function execution time."""
+
     @wraps(func)
     def wrapper(*args, **kwargs):
         t0 = time.perf_counter()
         result = func(*args, **kwargs)
         elapsed = time.perf_counter() - t0
-        print(f"[{func.__name__}] {elapsed*1000:.1f}ms")
+        print(f"[{func.__name__}] {elapsed * 1000:.1f}ms")
         return result
+
     return wrapper
 
 
