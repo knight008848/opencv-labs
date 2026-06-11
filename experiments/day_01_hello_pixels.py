@@ -38,6 +38,7 @@ else:
     sys.exit(1)
 
 
+# --- Exercise 1: explore shape, dtype, pixel access, mean values ---
 img = cv2.imread(str(frame_path))
 print(f"shape:  {img.shape}")      # (高, 宽, 通道数)
 print(f"dtype:  {img.dtype}")      # uint8
