@@ -108,20 +108,24 @@ def main():
         cv2.imwrite(str(bgr_path), img)
         cv2.imwrite(str(gray_path), img_gray)
 
-        size_bgr  = bgr_path.stat().st_size
-        size_gray = gray_path.stat().st_size
-        reduction = (1 - size_gray / size_bgr) * 100
+        if not bgr_path.exists() or not gray_path.exists():
+            print("Warning: failed to write temp files for size comparison")
+        else:
+            size_bgr  = bgr_path.stat().st_size
+            size_gray = gray_path.stat().st_size
+            reduction = (1 - size_gray / size_bgr) * 100
 
-        print(f"\n--- File Size Comparison ---")
-        print(f"  BGR  (3 channels): {size_bgr:>8,} bytes")
-        print(f"  Gray (1 channel):  {size_gray:>8,} bytes")
-        print(f"  Reduction:         {reduction:>7.1f}%")
+            print(f"\n--- File Size Comparison ---")
+            print(f"  BGR  (3 channels): {size_bgr:>8,} bytes")
+            print(f"  Gray (1 channel):  {size_gray:>8,} bytes")
+            print(f"  Reduction:         {reduction:>7.1f}%")
 
-        # Cleanup temp files
-        bgr_path.unlink()
-        gray_path.unlink()
+            # Cleanup temp files
+            bgr_path.unlink(missing_ok=True)
+            gray_path.unlink(missing_ok=True)
 
         print("\nDone — Day 02 complete.")
+        plt.close("all")  # safety net: close any leaked figures
 
 
 if __name__ == "__main__":
