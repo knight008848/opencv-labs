@@ -23,7 +23,7 @@ width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 print(f"Video: {width}x{height} @ {fps}fps")
 
-# Seek directly to frame 500 (0-indexed: 499)
+# Seek to frame index 1007, read and save frame 1008
 cap.set(cv2.CAP_PROP_POS_FRAMES, 1007)
 ret, frame = cap.read()
 cap.release()
@@ -35,6 +35,7 @@ if ret:
     print(f"Frame 1008 saved to {frame_path}")
 else:
     print("Error: Could not read frame 1008")
+    sys.exit(1)
 
 
 img = cv2.imread(str(frame_path))
