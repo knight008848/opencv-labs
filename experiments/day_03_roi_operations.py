@@ -5,24 +5,13 @@ Goal: Understand ROI operations — grid split, shuffle, border, reassemble
 Runtime: < 1 s
 """
 
+import os
 import sys
 from pathlib import Path
 
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-
-PALETTE = [
-    (0, 0, 255),  # red
-    (0, 255, 0),  # green
-    (255, 0, 0),  # blue
-    (0, 255, 255),  # yellow
-    (255, 0, 255),  # magenta
-    (255, 255, 0),  # cyan
-    (0, 128, 255),  # orange
-    (128, 0, 128),  # purple
-    (0, 128, 0),  # dark green
-]
 
 
 def split_grid(img: np.ndarray, rows: int = 3, cols: int = 3) -> list[list[np.ndarray]]:
@@ -50,17 +39,48 @@ def shuffle_and_border(
     tiles: list[list[np.ndarray]],
     border: int = 5,
     palette: list[tuple[int, int, int]] | None = None,
+    seed: int | None = None,
 ) -> tuple[np.ndarray, list[list[np.ndarray]]]:
     """Randomly shuffle tile positions, add colored borders.
 
-    Returns (flat_indices, bordered_2d_grid).
+    By default uses the global random state — each run produces a different
+    shuffle and different border colors.  Pass ``seed`` for reproducibility.
+
+    Args:
+        tiles: 2D grid of image tiles.
+        border: Border width in pixels.
+        palette: Optional list of BGR color tuples, one per original tile position.
+                 If None or too short, missing colors are auto-generated randomly.
+        seed: If given, uses a dedicated Generator for reproducible output.
+
+    Returns:
+        (flat_indices, bordered_2d_grid).
     """
     rows, cols = len(tiles), len(tiles[0])
     n = rows * cols
-    if palette is None:
-        palette = [(0, 0, 0)] * n
 
-    flat_indices = np.random.permutation(n)
+    # Use global PRNG by default (fresh shuffle each run); local Generator if seed given
+    rng = np.random.default_rng(seed) if seed is not None else None
+
+    # Build palette: auto-generate random colors if not provided (or too short)
+    if palette is None:
+        palette = [
+            tuple(np.random.randint(0, 256, 3).tolist())
+            if rng is None
+            else tuple(rng.integers(0, 256, 3).tolist())
+            for _ in range(n)
+        ]
+    elif len(palette) < n:
+        missing = n - len(palette)
+        extra = [
+            tuple(np.random.randint(0, 256, 3).tolist())
+            if rng is None
+            else tuple(rng.integers(0, 256, 3).tolist())
+            for _ in range(missing)
+        ]
+        palette = list(palette) + extra
+
+    flat_indices = np.random.permutation(n) if rng is None else rng.permutation(n)
     bordered = [[None] * cols for _ in range(rows)]
     for r in range(rows):
         for c in range(cols):
@@ -96,14 +116,14 @@ def main():
     print(f"shape: {img.shape}")
 
     tiles = split_grid(img, rows=3, cols=3)
-    flat_indices, bordered = shuffle_and_border(tiles, border=5, palette=PALETTE)
+    flat_indices, bordered = shuffle_and_border(tiles, border=5)
     puzzle = assemble(bordered)
 
     puzzle_path = result_dir / "day03_puzzle.jpg"
     cv2.imwrite(str(puzzle_path), puzzle)
     print(f"Saved puzzle to {puzzle_path}  ({puzzle.shape[1]}×{puzzle.shape[0]})")
 
-    # Display shuffled tiles
+    # Display and save shuffled tiles
     fig, axes = plt.subplots(3, 3, figsize=(10, 6))
     for idx, src_idx in enumerate(flat_indices):
         r, c = idx // 3, idx % 3
@@ -113,7 +133,14 @@ def main():
         ax.axis("off")
     fig.suptitle("Shuffled 3×3 Grid with Colored Borders")
     plt.tight_layout()
-    plt.show()
+
+    grid_path = result_dir / "day03_shuffled_grid.jpg"
+    fig.savefig(str(grid_path), dpi=120, bbox_inches="tight")
+    print(f"Saved shuffled grid to {grid_path}")
+
+    if os.environ.get("DISPLAY"):
+        plt.show()
+    plt.close(fig)
 
 
 if __name__ == "__main__":
