@@ -5,6 +5,7 @@ Goal: Compute grayscale histogram, assess exposure quality, apply histogram
       equalization (grayscale + color via HSV), generate a 3-panel report figure.
 Runtime: < 2 s
 """
+
 import sys
 from pathlib import Path
 
@@ -42,7 +43,7 @@ def assess_exposure(gray: np.ndarray) -> tuple[str, float, dict]:
     mean_val = float(np.mean(gray))
     p10, p25, p50, p75, p90 = np.percentile(gray, [10, 25, 50, 75, 90])
 
-    dark_frac = (gray < 50).mean()    # 像素值<50 的占比
+    dark_frac = (gray < 50).mean()  # 像素值<50 的占比
     bright_frac = (gray > 200).mean()  # 像素值>200 的占比
 
     # ── Classify exposure ────────────────────────────────────────────────
@@ -90,7 +91,6 @@ def equalize_color(img: np.ndarray) -> np.ndarray:
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     hsv[:, :, 2] = cv2.equalizeHist(hsv[:, :, 2])
     return cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
-
 
 
 # ── TODO 3: build_histogram_figure() ────────────────────────────────────────
@@ -149,10 +149,20 @@ def build_histogram_figure(
 
     mean_orig = float(np.mean(gray))
     mean_equ = float(np.mean(equ_gray))
-    ax3.axvline(mean_orig, color="steelblue", linestyle="--", linewidth=1.5,
-                label=f"Mean orig = {mean_orig:.0f}")
-    ax3.axvline(mean_equ, color="darkorange", linestyle="--", linewidth=1.5,
-                label=f"Mean equ = {mean_equ:.0f}")
+    ax3.axvline(
+        mean_orig,
+        color="steelblue",
+        linestyle="--",
+        linewidth=1.5,
+        label=f"Mean orig = {mean_orig:.0f}",
+    )
+    ax3.axvline(
+        mean_equ,
+        color="darkorange",
+        linestyle="--",
+        linewidth=1.5,
+        label=f"Mean equ = {mean_equ:.0f}",
+    )
 
     ax3.set_xlim(0, 255)
     ax3.set_xlabel("Pixel intensity")
@@ -202,8 +212,10 @@ def main():
     print(f"  Shape : {img.shape[1]}×{img.shape[0]}  ({img.shape[2]} channels)")
     print(f"  Exposure : {exposure_label}  (mean = {mean_val:.1f})")
     print("-" * 54)
-    print(f"  Percentiles  |  p10={info['p10']:5.0f}  p25={info['p25']:5.0f}  "
-          f"p50={info['p50']:5.0f}  p75={info['p75']:5.0f}  p90={info['p90']:5.0f}")
+    print(
+        f"  Percentiles  |  p10={info['p10']:5.0f}  p25={info['p25']:5.0f}  "
+        f"p50={info['p50']:5.0f}  p75={info['p75']:5.0f}  p90={info['p90']:5.0f}"
+    )
     print(f"  Dark  fraction (<  50) : {info['dark_frac']:.3f}")
     print(f"  Bright fraction (> 200) : {info['bright_frac']:.3f}")
     print("=" * 54)
