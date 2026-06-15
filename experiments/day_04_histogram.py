@@ -86,12 +86,10 @@ def assess_exposure(gray: np.ndarray) -> tuple[str, float, dict]:
 
 def equalize_color(img: np.ndarray) -> np.ndarray:
     """Equalize a color image safely — operate on V channel in HSV space."""
-    
-    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)   # 1. 转到 HSV
-    # 2. 取 V 通道（索引 2），做 equalizeHist，写回 
-    # hsv[:, :, 2] 取的是明度通道——[:, :] 是所有行所有列，, 2 是第 3 个通道（0=H, 1=S, 2=V）。
+
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     hsv[:, :, 2] = cv2.equalizeHist(hsv[:, :, 2])
-    return cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)   # 3. 转回来
+    return cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
 
 
 
