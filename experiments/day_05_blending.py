@@ -33,7 +33,7 @@ ALPHA_STEPS = np.linspace(0.0, 1.0, num=11)  # 0.0, 0.1, 0.2, ..., 1.0
 
 def blend_images(img_a: np.ndarray, img_b: np.ndarray, alpha: float) -> np.ndarray:
     """Alpha-blend two images. alpha=0 → all img_a, alpha=1 → all img_b."""
-    return cv2.addWeighted(img_a, alpha, img_b, 1 - alpha, 0)
+    return cv2.addWeighted(img_a, 1.0 - alpha, img_b, alpha, 0.0)
 
 
 # ── difference_map() ──────────────────────────────────────────────────────────
@@ -52,7 +52,7 @@ def difference_map(
     diff_raw = cv2.absdiff(img_a, img_b)
 
     diff_gray = cv2.cvtColor(diff_raw, cv2.COLOR_BGR2GRAY)
-    
+
     _, diff_thresh = cv2.threshold(diff_gray, threshold, 255, cv2.THRESH_BINARY)
 
     total_pixels = diff_thresh.size
@@ -71,7 +71,7 @@ def difference_map(
 def build_blending_report(
     img_a: np.ndarray,
     img_b: np.ndarray,
-    diff_thresh: np.ndarray,
+    diff_gray: np.ndarray,
     change_ratio: float,
 ) -> plt.Figure:
     """Generate a multi-panel report figure for the blending experiment."""
@@ -84,15 +84,13 @@ def build_blending_report(
 
     # ── Row 1: alpha blending progression (3 key steps) ──────────────
     for i, alpha in enumerate(KEY_ALPHAS):
-        blended = cv2.addWeighted(img_a, 1.0 - alpha, img_b, alpha, 0.0)
+        blended = blend_images(img_a, img_b, alpha)
         ax = fig.add_subplot(gs[0, i])
         ax.imshow(cv2.cvtColor(blended, cv2.COLOR_BGR2RGB))
         ax.set_title(f"α = {alpha:.2f}", fontsize=11)
         ax.axis("off")
 
     # ── Row 2: img_a | diff heatmap | img_b ──────────────────────────
-    diff_raw = cv2.absdiff(img_a, img_b)
-    diff_gray = cv2.cvtColor(diff_raw, cv2.COLOR_BGR2GRAY)
     diff_heatmap = cv2.applyColorMap(diff_gray, cv2.COLORMAP_JET)
 
     ax_a = fig.add_subplot(gs[1, 0])
@@ -148,13 +146,14 @@ def main() -> None:
 
     # ── 4. Difference map ──────────────────────────────────────────────
     diff_raw, diff_thresh, change_ratio = difference_map(img_a, img_b)
+    diff_gray = cv2.cvtColor(diff_raw, cv2.COLOR_BGR2GRAY)
     print("-" * 54)
     print(f"  Diff  |  changed pixels: {np.count_nonzero(diff_thresh)} / {diff_thresh.size}")
     print(f"        |  change ratio:   {change_ratio:.4f}  ({change_ratio * 100:.2f}%)")
     print("-" * 54)
 
     # ── 5. Build & save report ─────────────────────────────────────────
-    fig = build_blending_report(img_a, img_b, diff_thresh, change_ratio)
+    fig = build_blending_report(img_a, img_b, diff_gray, change_ratio)
     fig.savefig(OUTPUT_PATH, dpi=150)
     print(f"Report saved → {OUTPUT_PATH}")
 
