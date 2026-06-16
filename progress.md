@@ -5,11 +5,11 @@
 ## 当前状态
 
 - **开始日期：** 2026-06-09
-- **当前天数：** Day 4 / 30
-- **当前模块：** 模块 2 — 直方图与均衡化
-- **完成率：** 13%
+- **当前天数：** Day 5 / 30
+- **当前模块：** 模块 3 — 图像混合与 HSV 色彩过滤
+- **完成率：** 17%
 - **最终项目：** 具身视觉数据管道（MP4 -> 结构化观察数据）
-- **累计编码时间：** ~4.5 小时
+- **累计编码时间：** ~5.5 小时
 
 ---
 
@@ -22,10 +22,25 @@
 | 06-11 | Day 2 | 模块 1 | 3/3 | 100% (5/5) | ~1h | 色彩空间转换 + 通道操作 + colormap |
 | 06-11 | Day 3 | 模块 2 | 3/3 | 80% (4/5) | ~1h | ROI切片 + 九宫格拼图 + copyMakeBorder |
 | 06-15 | Day 4 | 模块 2 | 3/3 | 90% (4.5/5) | ~1h | 直方图计算 + 均衡化 + 曝光评估 |
+| 06-16 | Day 5 | 模块 3 | 3/3 | 100% (5/5) | ~1h | addWeighted 混合 + absdiff 差异检测 |
 
 ---
 
 ## 每日学习日志
+
+### Day 5 (2026-06-16) — 图像混合与差异检测
+
+**完成事项：**
+- [x] blend_images() — cv2.addWeighted alpha 混合，α+β=1
+- [x] difference_map() — cv2.absdiff + cv2.threshold(30) 过滤噪声 + 变化率计算
+- [x] build_blending_report() — GridSpec 2×3 报告图（3 个 alpha 节点 + 差异 JET 热力图）
+- [x] 两张 2160×3840 同尺寸图，无需 resize，change_ratio=5.76%
+- [x] Day 5 测验：5/5 (100%) — blending 专项测验
+
+**复盘三问：**
+1. addWeighted 的权重从哪来？没有标准公式——透明度混合用 α+β=1，HDR 融合按局部区域动态计算，水印叠加写死 9:1。权重由具体任务决定。
+2. 为什么要 threshold(30) 过滤？两张现实照片即使内容完全一样，传感器噪声和光线微动也会产生 1~5 的像素差。不设阈值的话 diff_thresh 全是"变化"，没有意义。
+3. 本模块如何用在最终项目？连续帧做 absdiff → change_ratio 突变 → 触发"操作台有新物体"事件 → 对该帧做 ROI 分析 + 物体识别。
 
 ### Day 4 (2026-06-15) — 直方图计算与均衡化
 
@@ -170,12 +185,12 @@
 ## 完成统计
 
 ```
-Week 1 图像基石:     4/7 天
+Week 1 图像基石:     5/7 天
 Week 2 图像变换:     0/7 天
 Week 3 图像分析:     0/7 天
 Week 4 进阶+项目:    0/9 天  (含 Day 29-30 项目冲刺)
 ----------------------------------------------
-总进度:             4/30 天
+总进度:             5/30 天
 ```
 
 ---
@@ -188,6 +203,10 @@ Week 4 进阶+项目:    0/9 天  (含 Day 29-30 项目冲刺)
 - [x] Day 4: 模块 2 — 直方图计算与均衡化
 - [x] 阅读 `docs/modules/02_roi_histogram.md` 概念 B-C
 - [x] 完成 `experiments/day_04_histogram.py`
-- [ ] Day 5: 模块 3 — 图像算术与 alpha 混合（addWeighted / bitwise / mask）
-- [ ] 阅读 `docs/modules/03_blending_hsv.md`
-- [ ] 完成 `experiments/day_05_blending.py`
+- [x] Day 5: 模块 3 — 图像算术与 alpha 混合（addWeighted / bitwise / mask）
+- [x] 阅读 `docs/modules/03_blending_hsv.md` 概念 A
+- [x] 完成 `experiments/day_05_blending.py`
+- [ ] Day 6: 模块 3 — HSV 色彩空间与 inRange 颜色过滤
+- [ ] 阅读 `docs/modules/03_blending_hsv.md` 概念 B-C
+- [ ] 完成 `experiments/day_06_color_filter.py`
+- [ ] Day 7: 阶段测试 1（模块 1-3 综合）
