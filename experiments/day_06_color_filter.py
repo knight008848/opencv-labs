@@ -53,17 +53,16 @@ def hsv_presets() -> dict[str, list[tuple[np.ndarray, np.ndarray]]]:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 2. apply_color_filter() — BGR → HSV → inRange → combined binary mask
+# 2. apply_color_filter() — HSV + inRange → combined binary mask
 # ═══════════════════════════════════════════════════════════════════════════════
 # Iterates all (lower, upper) pairs for a color and merges them via bitwise_or.
-# Single-range colors (green/blue/yellow/white) still work: one iteration, OR with zeros = identity.
+# Caller is responsible for BGR→HSV conversion (done once, reused 5×).
 
 
 def apply_color_filter(
-    img: np.ndarray, bounds: list[tuple[np.ndarray, np.ndarray]]
+    hsv: np.ndarray, bounds: list[tuple[np.ndarray, np.ndarray]]
 ) -> np.ndarray:
-    """Convert img BGR→HSV, apply inRange for each bound pair, combine with OR."""
-    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    """Apply inRange for each bound pair on a pre-computed HSV image, combine with OR."""
     mask = np.zeros(hsv.shape[:2], dtype=np.uint8)
     for lower, upper in bounds:
         mask = cv2.bitwise_or(mask, cv2.inRange(hsv, lower, upper))
@@ -93,10 +92,7 @@ def count_objects(mask: np.ndarray, min_area: int = 500) -> int:
     """Count connected regions in mask larger than min_area pixels."""
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     areas = [cv2.contourArea(c) for c in contours]
-    max_area = max(areas) if areas else 0
-    print(f"    contours={len(contours)}, max_area={max_area:.0f}, min_area={min_area}")
-    big_enough = [c for c in contours if cv2.contourArea(c) >= min_area]
-    return len(big_enough)
+    return sum(1 for a in areas if a >= min_area)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -161,13 +157,17 @@ def build_filter_report(
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def print_summary(counts: dict[str, int], masks: dict[str, np.ndarray]) -> None:
+def print_summary(
+    counts: dict[str, int], results: dict[str, dict[str, np.ndarray]]
+) -> None:
     """Print a terminal summary of detection results."""
-    total_pixels = next(iter(masks.values())).size  # any mask, same shape
+    any_mask = next(iter(results.values()))["mask"]
+    total_pixels = any_mask.size
     print("\n  Color    Objects    Mask Coverage")
     print("  ───────  ───────    ─────────────")
     for name in counts:
-        nonzero = int(cv2.countNonZero(masks[name]))
+        mask = results[name]["mask"]
+        nonzero = int(cv2.countNonZero(mask))
         coverage = nonzero / total_pixels * 100
         print(f"  {name:<7}  {counts[name]:>5}      {coverage:>6.1f}%  ({nonzero} px)")
     print()
@@ -192,16 +192,15 @@ def main() -> None:
     presets = hsv_presets()
 
     # ── 3. Process each color ───────────────────────────────────────────
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)  # convert once, reuse 5×
     results: dict[str, dict[str, np.ndarray]] = {}
     counts: dict[str, int] = {}
-    masks: dict[str, np.ndarray] = {}
     for name, bounds in presets.items():
-        mask = apply_color_filter(img, bounds)
+        mask = apply_color_filter(hsv, bounds)
         extracted = extract_objects(img, mask)
         count = count_objects(mask)
         results[name] = {"mask": mask, "extracted": extracted}
         counts[name] = count
-        masks[name] = mask
 
     # ── 4. Report figure ────────────────────────────────────────────────
     fig = build_filter_report(img, results, counts)
@@ -210,7 +209,7 @@ def main() -> None:
     print(f"Report saved to {OUTPUT_PATH}")
 
     # ── 5. Terminal summary ─────────────────────────────────────────────
-    print_summary(counts, masks)
+    print_summary(counts, results)
 
 
 if __name__ == "__main__":
