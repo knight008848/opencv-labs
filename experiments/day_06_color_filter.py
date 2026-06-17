@@ -59,9 +59,7 @@ def hsv_presets() -> dict[str, list[tuple[np.ndarray, np.ndarray]]]:
 # Caller is responsible for BGR→HSV conversion (done once, reused 5×).
 
 
-def apply_color_filter(
-    hsv: np.ndarray, bounds: list[tuple[np.ndarray, np.ndarray]]
-) -> np.ndarray:
+def apply_color_filter(hsv: np.ndarray, bounds: list[tuple[np.ndarray, np.ndarray]]) -> np.ndarray:
     """Apply inRange for each bound pair on a pre-computed HSV image, combine with OR."""
     mask = np.zeros(hsv.shape[:2], dtype=np.uint8)
     for lower, upper in bounds:
@@ -157,9 +155,7 @@ def build_filter_report(
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def print_summary(
-    counts: dict[str, int], results: dict[str, dict[str, np.ndarray]]
-) -> None:
+def print_summary(counts: dict[str, int], results: dict[str, dict[str, np.ndarray]]) -> None:
     """Print a terminal summary of detection results."""
     any_mask = next(iter(results.values()))["mask"]
     total_pixels = any_mask.size
