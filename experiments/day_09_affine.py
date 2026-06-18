@@ -10,7 +10,11 @@ import sys
 from pathlib import Path
 
 import cv2
+import matplotlib
 import numpy as np
+
+matplotlib.use("Agg")  # headless — no GUI available
+import matplotlib.pyplot as plt
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -18,6 +22,7 @@ RESULT_DIR = Path(__file__).resolve().parent / "results"
 DEFAULT_IMG = PROJECT_ROOT / "data" / "raw" / "test_large.jpg"  # 1200×1200
 OUTPUT_ROTATION = RESULT_DIR / "day09_rotation_collage.jpg"
 OUTPUT_PYRAMID = RESULT_DIR / "day09_pyramid_collage.jpg"
+OUTPUT_ROUNDTRIP = RESULT_DIR / "day09_pyramid_roundtrip.jpg"
 
 
 def _rotated_canvas_size(w: int, h: int, angle_deg: float, scale: float = 1.0) -> tuple[int, int]:
@@ -217,7 +222,79 @@ def build_pyramid_collage(img: np.ndarray) -> np.ndarray:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 6. print_rotation_stats() — terminal summary of canvas expansion per angle
+# 6. build_pyramid_roundtrip() — pyrDown→pyrUp back to original size × N
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# Each roundtrip: pyrDown (halve, discard detail) → pyrUp (double, guess).
+# The result is always the same size as the original — but blurrier each cycle.
+# This makes information loss DIRECTLY visible: all panels share the same
+# dimensions, only sharpness changes.
+#
+#   [Original]           ← baseline
+#   [↓↑ ×1  →300→600]    ← slightly blurred
+#   [↓↑ ×2  →150→600]    ← more blurred
+#   [↓↑ ×3  →75→600]     ← ghost of the original
+
+
+def build_pyramid_roundtrip(img: np.ndarray, rounds: int = 3) -> np.ndarray:
+    """Repeatedly pyrDown→pyrUp back to original size, showing cumulative blur.
+
+    All output panels have the same dimensions as the input — only the
+    sharpness degrades.  Rendered with matplotlib for clean labels.
+
+    Args:
+        img:    input image
+        rounds: number of pyrDown→pyrUp cycles (default 3)
+
+    Returns:
+        BGR image (matplotlib figure rendered to array)
+    """
+    h0, w0 = img.shape[:2]
+
+    rows = [img]
+    labels = [f"Original  ({w0}×{h0})"]
+
+    current = img
+    for r in range(1, rounds + 1):
+        # One full roundtrip
+        down = cv2.pyrDown(current)
+        current = cv2.pyrUp(down)
+        # Crop back to original size (pyrUp may overshoot by 1-2 px)
+        current = current[:h0, :w0]
+
+        from_w = down.shape[1]
+        rows.append(current)
+        labels.append(f"pyr↓↑ ×{r}  (→{from_w}→{w0})  {current.shape[1]}×{current.shape[0]}")
+
+    # ── Render with matplotlib ──
+    display_w = 400
+    n_rows = len(rows)
+    fig, axes = plt.subplots(n_rows, 1, figsize=(4.5, n_rows * 2.5))
+    if n_rows == 1:
+        axes = [axes]
+
+    for ax, image, label in zip(axes, rows, labels):
+        h, w = image.shape[:2]
+        disp = cv2.resize(image, (display_w, max(1, h * display_w // w)))
+        ax.imshow(cv2.cvtColor(disp, cv2.COLOR_BGR2RGB))
+        ax.set_title(label, fontsize=9, pad=3)
+        ax.axis("off")
+
+    plt.subplots_adjust(left=0.02, right=0.98, top=0.98, bottom=0.02, hspace=0.2)
+    fig.canvas.draw()
+    buf = np.asarray(fig.canvas.buffer_rgba())
+    result = cv2.cvtColor(buf[..., :3], cv2.COLOR_RGB2BGR)
+    plt.close(fig)
+    return result
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 7. print_rotation_stats() — terminal summary of canvas expansion per angle
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 7. print_rotation_stats() — terminal summary of canvas expansion per angle
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
@@ -257,11 +334,19 @@ def main() -> None:
     # 3. Rotation stats
     print_rotation_stats(w, h, list(range(0, 360, 30)))
 
-    # 4. Pyramid collage
-    print("\nBuilding Gaussian pyramid...")
+    # 4. Pyramid collage — progressive blur across levels
+    print("\nBuilding Gaussian pyramid (pyrDown levels→upscale→stitch)...")
     pyramid_strip = build_pyramid_collage(img)
     cv2.imwrite(str(OUTPUT_PYRAMID), pyramid_strip)
     print(f"  Saved → {OUTPUT_PYRAMID.name}  ({pyramid_strip.shape[0]}×{pyramid_strip.shape[1]})")
+
+    # 5. Pyramid roundtrip — pyrDown→pyrUp back to original size, show blur
+    print("\nBuilding pyramid roundtrip (pyr↓↑ ×1..3 back to original size)...")
+    roundtrip_strip = build_pyramid_roundtrip(img)
+    cv2.imwrite(str(OUTPUT_ROUNDTRIP), roundtrip_strip)
+    print(
+        f"  Saved → {OUTPUT_ROUNDTRIP.name}  ({roundtrip_strip.shape[0]}×{roundtrip_strip.shape[1]})"
+    )
 
 
 if __name__ == "__main__":
