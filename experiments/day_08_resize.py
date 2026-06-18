@@ -110,8 +110,9 @@ def process_batch(
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def print_results(stats: dict[str, tuple[int, int, float, int]],
-                   target_w: int, target_h: int) -> None:
+def print_results(
+    stats: dict[str, tuple[int, int, float, int]], target_w: int, target_h: int
+) -> None:
     """Print aligned summary table: filename, original size, scale, padding."""
     total_area = target_w * target_h
     header = f"{'File':<24} {'Original':>11} {'Scale':>8} {'Padding':>14}"
@@ -121,7 +122,9 @@ def print_results(stats: dict[str, tuple[int, int, float, int]],
     for fname, (orig_w, orig_h, scale, padding) in stats.items():
         direction = "↑" if scale > 1.0 else "↓"
         pct = padding / total_area * 100
-        print(f"{fname:<24} {orig_w:>4}×{orig_h:<4}  {direction} {scale:>5.2f}  {padding:>6} px ({pct:>4.1f}%)")
+        print(
+            f"{fname:<24} {orig_w:>4}×{orig_h:<4}  {direction} {scale:>5.2f}  {padding:>6} px ({pct:>4.1f}%)"
+        )
     print(f"{sep}\n{len(stats)} image(s) processed → {OUTPUT_DIR}")
 
 
