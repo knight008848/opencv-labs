@@ -29,7 +29,9 @@ TARGET_SIZE = (224, 224)  # (width, height) — matches resize() arg order
 #   - 返回 (结果图, scale, padding_pixels)
 
 
-def letterbox_resize(img: np.ndarray, target_w: int, target_h: int) -> tuple[np.ndarray, float, int]:
+def letterbox_resize(
+    img: np.ndarray, target_w: int, target_h: int
+) -> tuple[np.ndarray, float, int]:
     """Resize img to fit within target_w×target_h, pad with black to center.
 
     Args:
@@ -56,11 +58,10 @@ def letterbox_resize(img: np.ndarray, target_w: int, target_h: int) -> tuple[np.
     # 居中贴入
     x = (target_w - new_w) // 2
     y = (target_h - new_h) // 2
-    canvas[y:y+new_h, x:x+new_w] = resized
+    canvas[y : y + new_h, x : x + new_w] = resized
 
     padding = target_w * target_h - new_w * new_h
     return canvas, scale, padding
-
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -70,8 +71,7 @@ def letterbox_resize(img: np.ndarray, target_w: int, target_h: int) -> tuple[np.
 
 def collect_images(directory: Path) -> list[Path]:
     """Return a sorted list of .jpg/.png file paths (case-insensitive)."""
-    return sorted([p for p in directory.glob("*")
-                   if p.suffix.lower() in (".jpg", ".png")])
+    return sorted([p for p in directory.glob("*") if p.suffix.lower() in (".jpg", ".png")])
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -79,7 +79,9 @@ def collect_images(directory: Path) -> list[Path]:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def process_batch(image_paths: list[Path], output_dir: Path, target_w: int, target_h: int) -> dict[str, tuple[int, int, float, int]]:
+def process_batch(
+    image_paths: list[Path], output_dir: Path, target_w: int, target_h: int
+) -> dict[str, tuple[int, int, float, int]]:
     """Process every image: letterbox → save → return stats per file.
 
     Returns:
