@@ -20,8 +20,10 @@ import matplotlib.pyplot as plt
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 RESULT_DIR = Path(__file__).resolve().parent / "results"
 DEFAULT_IMG = PROJECT_ROOT / "data" / "raw" / "test_large.jpg"  # 1200×1200
-OUTPUT_ROTATION = RESULT_DIR / "day09_rotation_collage.jpg"
-OUTPUT_PYRAMID = RESULT_DIR / "day09_pyramid_collage.jpg"
+OUTPUT_ROTATION_H = RESULT_DIR / "day09_rotation_h.jpg"
+OUTPUT_ROTATION_V = RESULT_DIR / "day09_rotation_v.jpg"
+OUTPUT_PYRAMID_H = RESULT_DIR / "day09_pyramid_h.jpg"
+OUTPUT_PYRAMID_V = RESULT_DIR / "day09_pyramid_v.jpg"
 OUTPUT_ROUNDTRIP = RESULT_DIR / "day09_pyramid_roundtrip.jpg"
 
 
@@ -167,18 +169,65 @@ def stitch_horizontal(
     return np.hstack(cells)
 
 
+def stitch_vertical(
+    images: list[np.ndarray],
+    labels: list[str],
+    cell_height: int,
+) -> np.ndarray:
+    """Vertically stack images with labels — phone-friendly portrait layout.
+
+    Args:
+        images:     list of BGR images (may differ in height and width)
+        labels:     per-image label strings (e.g. angle or level name)
+        cell_height: force each cell to this height (shorter images get bottom-padded)
+
+    Returns:
+        Single BGR image (len(images) * cell_height × widest width)
+    """
+    # Normalise to 3-channel BGR
+    bgr_images = []
+    for img in images:
+        if img.ndim == 2:
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+        bgr_images.append(img)
+
+    widest = max(img.shape[1] for img in bgr_images)
+
+    cells = []
+    for img, label in zip(bgr_images, labels):
+        h, w = img.shape[:2]
+
+        # Pad width: narrower images get black bars on the right
+        if w < widest:
+            img = cv2.copyMakeBorder(img, 0, 0, 0, widest - w, cv2.BORDER_CONSTANT, value=(0, 0, 0))
+
+        # Pad height to ensure every cell is exactly cell_height
+        if h < cell_height:
+            img = cv2.copyMakeBorder(
+                img, cell_height - h, 0, 0, 0, cv2.BORDER_CONSTANT, value=(0, 0, 0)
+            )
+
+        # Draw label at top-left
+        cv2.putText(img, label, (5, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 1)
+
+        cells.append(img)
+
+    return np.vstack(cells)
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def build_rotation_collage(img: np.ndarray, step: int = 30) -> np.ndarray:
-    """Rotate img every `step` degrees (0..330), stitch into a row.
+def build_rotation_collage(img: np.ndarray, step: int = 30, orientation: str = "h") -> np.ndarray:
+    """Rotate img every `step` degrees (0..330), stitch into a collage.
 
     Args:
-        img:  input image
-        step: angle increment (default 30° → 12 frames)
+        img:         input image
+        step:        angle increment (default 30° → 12 frames)
+        orientation: "h" = horizontal strip, "v" = vertical stack (phone-friendly)
 
     Returns:
-        Horizontally stitched collage with angle labels
+        Stitched collage with angle labels
     """
 
     cells = []
@@ -189,6 +238,9 @@ def build_rotation_collage(img: np.ndarray, step: int = 30) -> np.ndarray:
         cells.append(rotated)
         labels.append(f"{angle}°")
 
+    if orientation == "v":
+        cell_height = max(c.shape[0] for c in cells)
+        return stitch_vertical(cells, labels, cell_height=cell_height)
     cell_width = max(c.shape[1] for c in cells)
     return stitch_horizontal(cells, labels, cell_width=cell_width)
 
@@ -196,7 +248,7 @@ def build_rotation_collage(img: np.ndarray, step: int = 30) -> np.ndarray:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def build_pyramid_collage(img: np.ndarray) -> np.ndarray:
+def build_pyramid_collage(img: np.ndarray, orientation: str = "h") -> np.ndarray:
     """Build Gaussian pyramid, upscale each level to original size, stitch.
 
     Each pyrDown level is half the resolution of the previous.  We resize every
@@ -204,10 +256,11 @@ def build_pyramid_collage(img: np.ndarray) -> np.ndarray:
     the classic textbook pyramid illustration.
 
     Args:
-        img: input image
+        img:         input image
+        orientation: "h" = horizontal strip, "v" = vertical stack (phone-friendly)
 
     Returns:
-        Horizontally stitched pyramid strip with level labels
+        Stitched pyramid strip with level labels
     """
     pyramid = build_pyramid(img)
     h0, w0 = pyramid[0].shape[:2]
@@ -218,6 +271,8 @@ def build_pyramid_collage(img: np.ndarray) -> np.ndarray:
         labels.append(f"L{i} ({level.shape[1]}×{level.shape[0]})")
         scaled.append(cv2.resize(level, (w0, h0), interpolation=cv2.INTER_CUBIC))
 
+    if orientation == "v":
+        return stitch_vertical(scaled, labels, cell_height=h0)
     return stitch_horizontal(scaled, labels, cell_width=w0)
 
 
@@ -289,12 +344,7 @@ def build_pyramid_roundtrip(img: np.ndarray, rounds: int = 3) -> np.ndarray:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 7. print_rotation_stats() — terminal summary of canvas expansion per angle
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 7. print_rotation_stats() — terminal summary of canvas expansion per angle
+# 5. print_rotation_stats() — terminal summary of canvas expansion per angle
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
@@ -309,12 +359,12 @@ def print_rotation_stats(orig_w: int, orig_h: int, angles: list[int]) -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 7. main() — pipeline orchestrator
+# 6. main() — pipeline orchestrator
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
 def main() -> None:
-    """Rotation collage + pyramid collage → save two report images."""
+    """Rotation + pyramid collages in both horizontal and vertical layouts."""
     # 1. Load image
     img = cv2.imread(str(DEFAULT_IMG))
     if img is None:
@@ -323,29 +373,30 @@ def main() -> None:
     h, w = img.shape[:2]
     print(f"Input: {DEFAULT_IMG.name}  {w}×{h}\n")
 
-    # 2. Rotation collage
+    # 2. Rotation collage — horizontal + vertical
     print("Building rotation collage (0°–330°, step 30°)...")
-    rotation_strip = build_rotation_collage(img, step=30)
-    cv2.imwrite(str(OUTPUT_ROTATION), rotation_strip)
-    print(
-        f"  Saved → {OUTPUT_ROTATION.name}  ({rotation_strip.shape[0]}×{rotation_strip.shape[1]})"
-    )
+    for orientation, path in [("h", OUTPUT_ROTATION_H), ("v", OUTPUT_ROTATION_V)]:
+        strip = build_rotation_collage(img, step=30, orientation=orientation)
+        cv2.imwrite(str(path), strip)
+        print(f"  Saved → {path.name}  ({strip.shape[0]}×{strip.shape[1]})")
 
     # 3. Rotation stats
     print_rotation_stats(w, h, list(range(0, 360, 30)))
 
-    # 4. Pyramid collage — progressive blur across levels
+    # 4. Pyramid collage — horizontal + vertical
     print("\nBuilding Gaussian pyramid (pyrDown levels→upscale→stitch)...")
-    pyramid_strip = build_pyramid_collage(img)
-    cv2.imwrite(str(OUTPUT_PYRAMID), pyramid_strip)
-    print(f"  Saved → {OUTPUT_PYRAMID.name}  ({pyramid_strip.shape[0]}×{pyramid_strip.shape[1]})")
+    for orientation, path in [("h", OUTPUT_PYRAMID_H), ("v", OUTPUT_PYRAMID_V)]:
+        strip = build_pyramid_collage(img, orientation=orientation)
+        cv2.imwrite(str(path), strip)
+        print(f"  Saved → {path.name}  ({strip.shape[0]}×{strip.shape[1]})")
 
     # 5. Pyramid roundtrip — pyrDown→pyrUp back to original size, show blur
     print("\nBuilding pyramid roundtrip (pyr↓↑ ×1..3 back to original size)...")
     roundtrip_strip = build_pyramid_roundtrip(img)
     cv2.imwrite(str(OUTPUT_ROUNDTRIP), roundtrip_strip)
     print(
-        f"  Saved → {OUTPUT_ROUNDTRIP.name}  ({roundtrip_strip.shape[0]}×{roundtrip_strip.shape[1]})"
+        f"  Saved → {OUTPUT_ROUNDTRIP.name}  "
+        f"({roundtrip_strip.shape[0]}×{roundtrip_strip.shape[1]})"
     )
 
 
