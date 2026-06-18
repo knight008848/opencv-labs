@@ -44,14 +44,14 @@ def letterbox_resize(img: np.ndarray, target_w: int, target_h: int) -> tuple[np.
     h, w = img.shape[:2]
     scale = min(target_w / w, target_h / h)
 
-    # 缩放 — 按方向选择插值
-    new_w, new_h = round(w * scale), round(h * scale)
+    # 缩放 — 按方向选择插值，clamp 防止 round 到 0
+    new_w, new_h = max(1, round(w * scale)), max(1, round(h * scale))
     interp = cv2.INTER_AREA if scale <= 1.0 else cv2.INTER_CUBIC
     resized = cv2.resize(img, (new_w, new_h), interpolation=interp)
 
     # 建黑色画布，兼容灰度/彩色
     canvas_shape = (target_h, target_w, img.shape[2]) if img.ndim == 3 else (target_h, target_w)
-    canvas = np.zeros(canvas_shape, dtype=np.uint8)
+    canvas = np.zeros(canvas_shape, dtype=img.dtype)
 
     # 居中贴入
     x = (target_w - new_w) // 2
@@ -69,8 +69,9 @@ def letterbox_resize(img: np.ndarray, target_w: int, target_h: int) -> tuple[np.
 
 
 def collect_images(directory: Path) -> list[Path]:
-    """Return a sorted list of .jpg and .png file paths under directory."""
-    return sorted([p for ext in ("*.jpg", "*.png") for p in directory.glob(ext)])
+    """Return a sorted list of .jpg/.png file paths (case-insensitive)."""
+    return sorted([p for p in directory.glob("*")
+                   if p.suffix.lower() in (".jpg", ".png")])
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -95,7 +96,9 @@ def process_batch(image_paths: list[Path], output_dir: Path, target_w: int, targ
         print(f"  {image.name}")
         h, w = img.shape[:2]
         resized, scale, padding = letterbox_resize(img, target_w, target_h)
-        cv2.imwrite(str(output_dir / image.name), resized)
+        ok = cv2.imwrite(str(output_dir / image.name), resized)
+        if not ok:
+            print(f"  [WARN] Failed to write {image.name}")
         stats[image.name] = (w, h, scale, padding)
     return stats
 
@@ -121,6 +124,9 @@ def print_results(stats: dict[str, tuple[int, int, float, int]]) -> None:
 def main() -> None:
     """Discover → process → report pipeline."""
     # 1. Discover images
+    if not RAW_DIR.exists():
+        print(f"Input directory not found: {RAW_DIR}")
+        sys.exit(1)
     images = collect_images(RAW_DIR)
     if not images:
         print(f"No jpg/png files found in {RAW_DIR}")
