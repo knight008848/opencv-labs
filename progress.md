@@ -5,9 +5,9 @@
 ## 当前状态
 
 - **开始日期：** 2026-06-09
-- **当前天数：** Day 7 / 30
-- **当前模块：** 阶段测试 1 完成 → 准备进入模块 4（几何变换）
-- **完成率：** 23%
+- **当前天数：** Day 8 / 30
+- **当前模块：** 模块 4 — 几何变换（缩放 + letterbox 完成）
+- **完成率：** 27%
 - **最终项目：** 具身视觉数据管道（MP4 -> 结构化观察数据）
 - **累计编码时间：** ~7.5 小时
 
@@ -25,6 +25,7 @@
 | 06-16 | Day 5 | 模块 3 | 3/3 | 100% (5/5) | ~1h | addWeighted 混合 + absdiff 差异检测 |
 | 06-17 | Day 6 | 模块 3 | 3/3 | - | ~1.5h | HSV inRange 5色过滤 + findContours 物体计数 |
 | 06-17 | Day 7 | 阶段测试 1 | - | 86% (6/7) | ~0.5h | 模块 1-3 综合测试 |
+| 06-18 | Day 8 | 模块 4 | 1/1 | - | ~1h | letterbox 批量预处理 224×224 |
 
 ---
 
@@ -48,6 +49,25 @@
 1. Q7 为什么出错？题目给了明确的规则（p50<60 或 p95<150→欠曝），我却用自己记得的 Day 4 逻辑替换了。做题不是做工程——先读题、用题目给的条件、不要自作主张优化。
 2. Q1-Q6 为什么全对？shape 维度、addWeighted 饱和截断、红色 H 跨环、HSV 均衡化、threshold API、findContours API——这些经过 Day 1-6 反复练习已经扎实。
 3. Week 1 最大的收获是什么？知道了 OpenCV 的"性格"：BGR 不是 RGB、HSV 解耦优于直接操作 BGR 通道、所有运算前先问自己"要不要 copy"。
+
+### Day 8 (2026-06-18) — 图像缩放与 letterbox
+
+**完成事项：**
+- [x] `letterbox_resize()` — 保持纵横比缩放 + 黑色居中填充
+- [x] `collect_images()` — 多后缀扫描 (jpg/png)
+- [x] `process_batch()` — 批量处理 + 统计收集
+- [x] `print_results()` — 终端打印原尺寸/scale/padding
+- [x] 生成 8 张合成测试图（覆盖 4:3、3:4、16:9、5:2、1:1、极小、超大）
+- [x] 8/8 输出严格 224×224，无拉伸变形
+
+**薄弱点发现：**
+- `rglob` 返回生成器不能用 `+` 拼接 → 已解决（列表推导）
+- `round()` 可能导致缩放后尺寸超 target 1 像素 → 用 `int()` 截断更安全
+
+**复盘三问：**
+1. resize 参数顺序是 `(宽, 高)` 但 shape 是 `(高, 宽)`——今天记住了吗？骨架上特意标了注释 `TARGET_SIZE = (224, 224)  # (width, height)`，`letterbox_resize` 内部也统一了顺序，没被坑。
+2. INTER_AREA vs INTER_CUBIC 的选择策略？缩小用 AREA（无摩尔纹），放大用 CUBIC（看周围 16 邻居猜）。缩小是去掉冗余信息（平均），放大是补出不存在的信息（插值）。
+3. letterbox 最终项目里用在哪？视频每一帧标准化到固定尺寸 → 送入 ROI 分析。如果原图比模型输入大（常态），letterbox 在降采样同时保留全貌。
 
 ### Day 6 (2026-06-17) — HSV 色彩空间与 inRange 颜色过滤
 
@@ -230,11 +250,11 @@
 
 ```
 Week 1 图像基石:     7/7 天  ✓
-Week 2 图像变换:     0/7 天
+Week 2 图像变换:     1/7 天
 Week 3 图像分析:     0/7 天
 Week 4 进阶+项目:    0/9 天  (含 Day 29-30 项目冲刺)
 ----------------------------------------------
-总进度:             7/30 天
+总进度:             8/30 天
 ```
 
 ---
@@ -254,6 +274,9 @@ Week 4 进阶+项目:    0/9 天  (含 Day 29-30 项目冲刺)
 - [x] 阅读 `docs/modules/03_blending_hsv.md` 概念 B-C
 - [x] 完成 `experiments/day_06_color_filter.py`
 - [x] Day 7: 阶段测试 1（模块 1-3 综合）→ 6/7 (86%)
-- [ ] Day 8: 模块 4 — 几何变换（resize / warpAffine / warpPerspective / 图像金字塔）
-- [ ] 阅读 `docs/modules/04_geometric_transform.md`
-- [ ] 完成 `experiments/day_08_geometric.py`
+- [x] Day 8: 模块 4 — 几何变换（缩放 + letterbox）
+- [x] 阅读 `docs/modules/04_resize_affine.md` 概念 A
+- [x] 完成 `experiments/day_08_resize.py`
+- [ ] Day 9: 模块 4 — 仿射变换（旋转 / warpAffine / 金字塔）
+- [ ] 阅读 `docs/modules/04_resize_affine.md` 概念 B-C
+- [ ] 完成 `experiments/day_09_affine.py`
