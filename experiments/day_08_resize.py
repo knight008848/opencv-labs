@@ -110,12 +110,19 @@ def process_batch(
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def print_results(stats: dict[str, tuple[int, int, float, int]]) -> None:
-    """Print per-image summary: filename, original size, scale, padding."""
-    print()
+def print_results(stats: dict[str, tuple[int, int, float, int]],
+                   target_w: int, target_h: int) -> None:
+    """Print aligned summary table: filename, original size, scale, padding."""
+    total_area = target_w * target_h
+    header = f"{'File':<24} {'Original':>11} {'Scale':>8} {'Padding':>14}"
+    sep = "-" * len(header)
+
+    print(f"\n{header}\n{sep}")
     for fname, (orig_w, orig_h, scale, padding) in stats.items():
-        print(f"{fname}: {orig_w}×{orig_h} → scale {scale:.2f}, padding {padding} pixels")
-    print(f"\n{len(stats)} image(s) processed → {OUTPUT_DIR}")
+        direction = "↑" if scale > 1.0 else "↓"
+        pct = padding / total_area * 100
+        print(f"{fname:<24} {orig_w:>4}×{orig_h:<4}  {direction} {scale:>5.2f}  {padding:>6} px ({pct:>4.1f}%)")
+    print(f"{sep}\n{len(stats)} image(s) processed → {OUTPUT_DIR}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -143,7 +150,7 @@ def main() -> None:
     stats = process_batch(images, OUTPUT_DIR, *TARGET_SIZE)
 
     # 4. Terminal report
-    print_results(stats)
+    print_results(stats, *TARGET_SIZE)
 
 
 if __name__ == "__main__":
