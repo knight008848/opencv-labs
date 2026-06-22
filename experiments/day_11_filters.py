@@ -51,9 +51,6 @@ def apply_filter(img: np.ndarray, filter_type: str, params: dict | None) -> np.n
     Returns:
         Filtered BGR image.
     """
-    # HINT: dispatch dict → cv2.GaussianBlur / cv2.medianBlur /
-    #       cv2.bilateralFilter / cv2.blur
-    # HINT: bilateralFilter returns the image directly (no dst arg needed)
     if filter_type == "gaussian":
         return cv2.GaussianBlur(img, **params)
     elif filter_type == "median":
@@ -84,7 +81,6 @@ def count_canny_edges(img: np.ndarray, low: int = CANNY_LOW, high: int = CANNY_H
     Returns:
         Integer count of edge pixels (cv2.countNonZero on the Canny result).
     """
-    # HINT: cvtColor BGR→GRAY, then cv2.Canny, then cv2.countNonZero
     img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     edges = cv2.Canny(img_gray, low, high)
     return cv2.countNonZero(edges)
@@ -105,8 +101,9 @@ def run_filter_benchmark(
         specs: list of (label, filter_type, params) tuples.
 
     Returns:
-        images: list of BGR results (same order as specs).
-        times_ms: list of elapsed milliseconds per filter.
+        labels:   filter names (same order as specs).
+        images:   BGR result images (same order as specs).
+        times_ms: elapsed milliseconds per filter.
     """
     labels = []
     images = []
@@ -119,10 +116,10 @@ def run_filter_benchmark(
             labels.append(label)
         else:
             start_time = time.perf_counter()
-            img = apply_filter(original_img, filter_type, params)
+            filtered = apply_filter(original_img, filter_type, params)
             end_time = time.perf_counter()
             labels.append(label)
-            images.append(img)
+            images.append(filtered)
             times_ms.append((end_time - start_time) * 1000)
     return labels, images, times_ms
 
@@ -151,12 +148,6 @@ def build_filter_report(
     Returns:
         matplotlib Figure.
     """
-    # HINT: fig = plt.figure with GridSpec(3, 3).
-    #       Top 2 rows (indices 0-5): imshow each image.
-    #       Bottom row (span all 3 cols): horizontal bar chart of
-    #       count_canny_edges() per filter, sorted descending.
-    # HINT: bar colours — use a muted palette so the chart doesn't scream.
-    # HINT: annotate each bar with the edge count and the timing in ms.
     fig = plt.figure(figsize=(16, 12))
     gs = fig.add_gridspec(3, 3, hspace=0.35, wspace=0.15)
 
@@ -171,18 +162,14 @@ def build_filter_report(
     # --- Bottom row: edge-retention bar chart ---
     ax_bar = fig.add_subplot(gs[2, :])
     edge_counts = [count_canny_edges(im) for im in images]
-    bar_colours = ["#6c8cbf"] * len(labels)  # muted blue
 
     # Sort descending by edge count
-    indexed = sorted(
-        enumerate(zip(labels, edge_counts, times_ms)), key=lambda x: x[1][1], reverse=True
+    sorted_labels, sorted_counts, sorted_times = zip(
+        *sorted(zip(labels, edge_counts, times_ms), key=lambda x: x[1], reverse=True)
     )
-    sorted_labels = [labels[i] for i, _ in indexed]
-    sorted_counts = [edge_counts[i] for i, _ in indexed]
-    sorted_times = [times_ms[i] for i, _ in indexed]
 
     bars = ax_bar.barh(
-        sorted_labels, sorted_counts, color=bar_colours, edgecolor="#3a5a8c", height=0.6
+        sorted_labels, sorted_counts, color="#6c8cbf", edgecolor="#3a5a8c", height=0.6
     )
     ax_bar.invert_yaxis()
     ax_bar.set_xlabel("Canny Edge Pixels", fontsize=11)
