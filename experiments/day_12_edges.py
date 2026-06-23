@@ -35,7 +35,11 @@ def sobel_edges(gray: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     sobel_x = cv2.Sobel(gray, cv2.CV_64F, dx=1, dy=0, ksize=3)
     sobel_y = cv2.Sobel(gray, cv2.CV_64F, dx=0, dy=1, ksize=3)
     sobel_combined = cv2.magnitude(sobel_x, sobel_y)
-    return cv2.convertScaleAbs(sobel_x), cv2.convertScaleAbs(sobel_y), cv2.convertScaleAbs(sobel_combined)
+    return (
+        cv2.convertScaleAbs(sobel_x),
+        cv2.convertScaleAbs(sobel_y),
+        cv2.convertScaleAbs(sobel_combined),
+    )
 
 
 def laplacian_edges(gray: np.ndarray) -> np.ndarray:
@@ -224,9 +228,7 @@ def _make_test_document(height: int = 1200, width: int = 1600) -> np.ndarray:
     bg = np.zeros((h, w, 3), dtype=np.uint8)
     bg[:] = (60, 100, 180)
 
-    src_corners = np.float32([
-        [250, 170], [1350, 280], [1200, 1050], [380, 930]
-    ])
+    src_corners = np.float32([[250, 170], [1350, 280], [1200, 1050], [380, 930]])
 
     doc_w, doc_h = 1400, 900
     flat = np.ones((doc_h, doc_w, 3), dtype=np.uint8) * 245
@@ -235,7 +237,15 @@ def _make_test_document(height: int = 1200, width: int = 1600) -> np.ndarray:
     cv2.line(flat, (60, 90), (doc_w - 60, 90), (0, 0, 0), 2)
 
     overlay = flat.copy()
-    cv2.putText(overlay, "CONFIDENTIAL", (doc_w // 2 - 280, doc_h // 2 + 20), cv2.FONT_HERSHEY_SIMPLEX, 2.2, (200, 200, 210), 6)
+    cv2.putText(
+        overlay,
+        "CONFIDENTIAL",
+        (doc_w // 2 - 280, doc_h // 2 + 20),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        2.2,
+        (200, 200, 210),
+        6,
+    )
     flat = cv2.addWeighted(flat, 0.72, overlay, 0.28, 0)
 
     paragraphs = [
@@ -275,6 +285,7 @@ def _make_test_document(height: int = 1200, width: int = 1600) -> np.ndarray:
     cv2.putText(bg, "TL", (280, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
     return bg
+
 
 # ---------------------------------------------------------------------------
 
