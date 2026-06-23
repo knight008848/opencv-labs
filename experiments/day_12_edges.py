@@ -44,18 +44,24 @@ def laplacian_edges(gray: np.ndarray) -> np.ndarray:
     return cv2.convertScaleAbs(laplacian)
 
 
-def canny_edges(gray: np.ndarray, low: int, high: int) -> np.ndarray:
-    """Canny edge detection with prior Gaussian blur."""
-    blurred = cv2.GaussianBlur(gray, GAUSSIAN_BLUR_KSIZE, 0)
+def canny_edges(blurred: np.ndarray, low: int, high: int) -> np.ndarray:
+    """Canny edge detection on a pre-blurred grayscale image.
+
+    The caller is responsible for applying GaussianBlur first — this avoids
+    re-blurring the same image for every threshold variant.
+    """
     return cv2.Canny(blurred, low, high)
 
 
-def auto_canny(gray: np.ndarray) -> tuple[np.ndarray, float, float]:
-    """Auto Canny using the median method: t1 = median*0.66, t2 = median*1.33."""
-    median = np.median(gray)
-    t1 = int(max(0, min(255, median * 0.66)))
-    t2 = int(max(0, min(255, median * 1.33)))
-    return canny_edges(gray, t1, t2), t1, t2
+def auto_canny(blurred: np.ndarray) -> tuple[np.ndarray, float, float]:
+    """Auto Canny using the median method: t1 = median*0.66, t2 = median*1.33.
+
+    Accepts a pre-blurred image (median of blurred ≈ median of original).
+    """
+    median = np.median(blurred)
+    t1 = int(np.clip(median * 0.66, 0, 255))
+    t2 = int(np.clip(median * 1.33, 0, 255))
+    return canny_edges(blurred, t1, t2), t1, t2
 
 
 # ---------------------------------------------------------------------------
@@ -64,75 +70,59 @@ def auto_canny(gray: np.ndarray) -> tuple[np.ndarray, float, float]:
 
 
 def run_edge_benchmark(gray: np.ndarray) -> dict:
-    """Run all 10 edge detectors, return results with timing."""
-    labels = []
-    images = []
-    times_ms = []
+    """Run all 10 edge detectors, return results with timing.
+
+    A single list of (label, image, time_ms) tuples replaces the three parallel
+    lists — no risk of append misalignment.
+    """
+    results: list[tuple[str, np.ndarray, float]] = []
+
+    # Pre-blur once for all Canny variants (was 5× GaussianBlur in canny_edges)
+    blurred = cv2.GaussianBlur(gray, GAUSSIAN_BLUR_KSIZE, 0)
 
     # ---- Row 1 detectors ----
     t0 = time.perf_counter()
     sx, sy, scomb = sobel_edges(gray)
     t_sobel = (time.perf_counter() - t0) * 1000
-
-    labels.append("Sobel X")
-    images.append(sx)
-    times_ms.append(t_sobel)
-
-    labels.append("Sobel Y")
-    images.append(sy)
-    times_ms.append(t_sobel)
-
-    labels.append("Sobel Combined")
-    images.append(scomb)
-    times_ms.append(t_sobel)
+    results.append(("Sobel X", sx, t_sobel))
+    results.append(("Sobel Y", sy, t_sobel))
+    results.append(("Sobel Combined", scomb, t_sobel))
 
     t0 = time.perf_counter()
     lap = laplacian_edges(gray)
-    times_ms.append((time.perf_counter() - t0) * 1000)
-    labels.append("Laplacian")
-    images.append(lap)
+    results.append(("Laplacian", lap, (time.perf_counter() - t0) * 1000))
 
     t0 = time.perf_counter()
-    c50_150 = canny_edges(gray, 50, 150)
-    t_c50_150 = (time.perf_counter() - t0) * 1000
-    labels.append("Canny(50,150)")
-    images.append(c50_150)
-    times_ms.append(t_c50_150)
+    c50_150 = canny_edges(blurred, 50, 150)
+    t_c50 = (time.perf_counter() - t0) * 1000
+    results.append(("Canny(50,150)", c50_150, t_c50))
 
     # ---- Row 2 detectors ----
     t0 = time.perf_counter()
-    c30_90 = canny_edges(gray, 30, 90)
-    times_ms.append((time.perf_counter() - t0) * 1000)
-    labels.append("Canny(30,90)")
-    images.append(c30_90)
+    c30_90 = canny_edges(blurred, 30, 90)
+    results.append(("Canny(30,90)", c30_90, (time.perf_counter() - t0) * 1000))
 
-    # Canny(50,150) reused — same image, same timing
-    labels.append("Canny(50,150)")
-    images.append(c50_150)
-    times_ms.append(t_c50_150)
+    # Canny(50,150) reused for the 2×5 grid — same image, same timing
+    results.append(("Canny(50,150)", c50_150, t_c50))
 
     t0 = time.perf_counter()
-    c100_200 = canny_edges(gray, 100, 200)
-    times_ms.append((time.perf_counter() - t0) * 1000)
-    labels.append("Canny(100,200)")
-    images.append(c100_200)
+    c100_200 = canny_edges(blurred, 100, 200)
+    results.append(("Canny(100,200)", c100_200, (time.perf_counter() - t0) * 1000))
 
     t0 = time.perf_counter()
-    c150_250 = canny_edges(gray, 150, 250)
-    times_ms.append((time.perf_counter() - t0) * 1000)
-    labels.append("Canny(150,250)")
-    images.append(c150_250)
+    c150_250 = canny_edges(blurred, 150, 250)
+    results.append(("Canny(150,250)", c150_250, (time.perf_counter() - t0) * 1000))
 
     t0 = time.perf_counter()
-    ac_edges, auto_t1, auto_t2 = auto_canny(gray)
-    times_ms.append((time.perf_counter() - t0) * 1000)
-    labels.append(f"Canny(auto: {auto_t1:.0f},{auto_t2:.0f})")
-    images.append(ac_edges)
+    ac_edges, auto_t1, auto_t2 = auto_canny(blurred)
+    results.append(
+        (f"Canny(auto: {auto_t1:.0f},{auto_t2:.0f})", ac_edges, (time.perf_counter() - t0) * 1000)
+    )
 
     return {
-        "labels": labels,
-        "images": images,
-        "times_ms": times_ms,
+        "labels": [r[0] for r in results],
+        "images": [r[1] for r in results],
+        "times_ms": [r[2] for r in results],
         "auto_t1": auto_t1,
         "auto_t2": auto_t2,
     }
