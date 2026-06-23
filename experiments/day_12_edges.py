@@ -193,10 +193,14 @@ def main() -> None:
     # 3. Run all edge detectors
     results = run_edge_benchmark(gray)
 
-    # 4. Print timing ranking
-    ranked = sorted(
-        zip(results["labels"], results["times_ms"]), key=lambda x: x[1]
-    )
+    # 4. Print timing ranking (deduplicate reused detectors)
+    seen = set()
+    unique = []
+    for name, t in zip(results["labels"], results["times_ms"]):
+        if name not in seen:
+            seen.add(name)
+            unique.append((name, t))
+    ranked = sorted(unique, key=lambda x: x[1])
     print("\n[INFO] Edge detector timing (ms):")
     for rank, (name, t) in enumerate(ranked, 1):
         marker = " <- fastest" if rank == 1 else (" <- slowest" if rank == len(ranked) else "")
@@ -204,8 +208,10 @@ def main() -> None:
 
     # 5. Print Canny edge pixel density
     print("\n[INFO] Canny edge pixel density:")
+    seen_canny = set()
     for name, edges in zip(results["labels"], results["images"]):
-        if "Canny" in name:
+        if "Canny" in name and name not in seen_canny:
+            seen_canny.add(name)
             print(f"  {name:35s}: {cv2.countNonZero(edges):,} px")
 
     # 6. Save report figure
@@ -243,21 +249,20 @@ def _make_test_document(height: int = 1200, width: int = 1600) -> np.ndarray:
     flat = cv2.addWeighted(flat, 0.72, overlay, 0.28, 0)
 
     paragraphs = [
-        "This document simulates a photograph of a piece of paper",
-        "taken from an angle.  Perspective correction (Day 10) uses",
-        "a 3x3 homography matrix to map four clicked corners onto a",
-        "flat A4-proportioned rectangle — the same math that powers",
-        "document scanners, AR marker tracking, and bird''s-eye view",
-        "transforms in autonomous driving.",
+        "Edge detection is the foundation of computer vision —",
+        "before you can recognize an object, you must first find its",
+        "boundaries.  Sobel (1st derivative) captures gradient",
+        "direction and magnitude; Laplacian (2nd derivative) is fast",
+        "but amplifies noise; Canny adds Gaussian blur, non-maximum",
+        "suppression, and hysteresis thresholding for clean, single-",
+        "pixel-wide edges that are the gold standard in industry.",
         "",
-        "    TL               TR",
-        "     o-------------o",
-        "     |             |",
-        "     |    CLICK    |",
-        "     |    FOUR     |",
-        "     |   CORNERS   |",
-        "     o-------------o",
-        "    BL               BR",
+        "    Sobel X:          Canny thresholds:",
+        "     -1  0 +1          low=30,90  (dense)",
+        "     -2  0 +2          low=50,150 (balanced)",
+        "     -1  0 +1          low=100,200 (moderate)",
+        "                       low=150,250 (sparse)",
+        "    Auto Canny: t = median * [0.66, 1.33]",
     ]
     y = 140
     for line in paragraphs:
