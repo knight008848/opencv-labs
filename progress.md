@@ -5,11 +5,11 @@
 ## 当前状态
 
 - **开始日期：** 2026-06-09
-- **当前天数：** Day 12 / 30
-- **当前模块：** 模块 6 — 边缘检测（已完成，测验 5/6）
-- **完成率：** 40%
+- **当前天数：** Day 13 / 30
+- **当前模块：** 模块 6 — 边缘检测（已完成，测验 5/6 + 组合 Pipeline）
+- **完成率：** 43%
 - **最终项目：** 具身视觉数据管道（MP4 -> 结构化观察数据）
-- **累计编码时间：** ~13.5 小时
+- **累计编码时间：** ~15 小时
 
 ---
 
@@ -30,6 +30,7 @@
 | 06-22 | Day 10 | 模块 5 | 1/1 | 80% (4/5) | ~1h | 透视变换4点矫正 + ginput交互 + 逆warp合成测试图 |
 | 06-22 | Day 11 | 模块 5 | 1/1 | 83% (5/6) | ~1h | 6合1滤波对比 + Canny边缘保留度 + benchmark耗时排序 |
 | 06-23 | Day 12 | 模块 6 | 1/1 | 83% (5/6) | ~1.5h | Sobel/Canny/Laplacian 边缘检测 + Canny 阈值扫描 + 自动 Canny |
+| 06-25 | Day 13 | 模块 6 | 1/1 | - | ~1.5h | 组合 Pipeline：中值→高斯→Canny→四边形→透视矫正 |
 
 ---
 
@@ -53,6 +54,32 @@
 1. Q7 为什么出错？题目给了明确的规则（p50<60 或 p95<150→欠曝），我却用自己记得的 Day 4 逻辑替换了。做题不是做工程——先读题、用题目给的条件、不要自作主张优化。
 2. Q1-Q6 为什么全对？shape 维度、addWeighted 饱和截断、红色 H 跨环、HSV 均衡化、threshold API、findContours API——这些经过 Day 1-6 反复练习已经扎实。
 3. Week 1 最大的收获是什么？知道了 OpenCV 的"性格"：BGR 不是 RGB、HSV 解耦优于直接操作 BGR 通道、所有运算前先问自己"要不要 copy"。
+
+### Day 13 (2026-06-25) — 滤波+边缘+透视组合 Pipeline
+
+**完成事项：**
+- [x] `denoise_median()` — 中值滤波去除椒盐噪声
+- [x] `smooth_gaussian()` — 高斯模糊进一步平滑
+- [x] `extract_edges()` — Canny 边缘检测 + 边缘密度打印
+- [x] `find_largest_quadrilateral()` — RETR_EXTERNAL + approxPolyDP 筛选4顶点 + 最大面积
+- [x] `warp_document()` — getPerspectiveTransform + warpPerspective 透视矫正
+- [x] `build_combo_report()` — 2×3 报告图（原图/去噪/边缘+四边形叠层/矫正图/矫正边缘/状态）
+- [x] `add_salt_pepper_noise()` — 三段式 mask 椒盐噪声 (ADD_NOISE=False 默认关闭)
+- [x] 完整 Pipeline 6 步 + 每步计时 + corners=None 兜底
+
+**自我练习完成的函数：**
+- `denoise_median` ✅ `smooth_gaussian` ✅ `extract_edges` ✅ `add_salt_pepper_noise` ✅
+- `find_largest_quadrilateral` ✅ `warp_document` ✅ `main()` 串联 ✅
+
+**关键发现：**
+- `findContours` 返回的 contours 是 `(N, 1, 2)` 格式，需 `reshape(4, 2)` 才能得到 `(4, 2)` 四边形坐标
+- `approxPolyDP` 的 epsilon 用 `0.02 * arcLength` 是个好起点——太大会把四边形压成三角形，太小会保留多余顶点
+- `add_salt_pepper_noise` 的初级 bug：`mask >= prob/2` 会染黑 99% 的像素，正确做法是 `(mask >= prob/2) & (mask < prob)`
+
+**复盘三问：**
+1. 为什么先中值滤波再高斯模糊，顺序能换吗？不能。中值滤波去掉离散的椒盐点，高斯平滑去掉残留的纹理噪点——如果顺序反了，高斯先晕开会把椒盐的"椒"和"盐"扩散成大块模糊区域，中值再也救不回来。
+2. 为什么在透视矫正之后还要对矫正图再做一次Canny？不是为了再找四边形，而是为了验证矫正后文档边缘干净（矫正图的边缘应该是完整的文字轮廓，没有倾斜伪影）。
+3. findContours 用 RETR_EXTERNAL 和 RETR_LIST 的区别？EXTERNAL 只取最外层轮廓（文档边框），LIST 取所有层级（文字笔画也算）。对于文档扫描场景，EXTERNAL 就够了。
 
 ### Day 12 (2026-06-23) — 边缘检测实验室
 
@@ -371,11 +398,11 @@
 
 ```
 Week 1 图像基石:     7/7 天  ✓
-Week 2 图像变换:     5/7 天
+Week 2 图像变换:     6/7 天
 Week 3 图像分析:     0/7 天
 Week 4 进阶+项目:    0/9 天  (含 Day 29-30 项目冲刺)
 ----------------------------------------------
-总进度:             11/30 天
+总进度:             12/30 天
 ```
 
 ---
@@ -413,6 +440,7 @@ Week 4 进阶+项目:    0/9 天  (含 Day 29-30 项目冲刺)
 - [x] 阅读 `docs/modules/06_edge_detection.md` 概念 A-C
 - [x] 完成 `experiments/day_12_edges.py`
 - [x] 模块 6 测验：5/6 (83%)
-- [ ] Day 13: 模块 6 — 组合 Pipeline：中值去噪 → 高斯平滑 → Canny 提取四边 → 找最大四边形 → 透视矫正 → 灰度图/边缘图对比
-- [ ] 阅读 `docs/modules/06_edge_detection.md` Day 13 任务
-- [ ] 完成 `experiments/day_13_combo.py`
+- [x] Day 13: 模块 6 — 组合 Pipeline
+- [x] 阅读 `docs/modules/06_edge_detection.md` Day 13 任务
+- [x] 完成 `experiments/day_13_combo.py`
+- [ ] Day 14: 阶段测试 2（模块 4-6 综合）
