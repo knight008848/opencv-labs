@@ -285,7 +285,7 @@ def print_pipeline_summary(
     print(f"  {'TOTAL':35s} {total*1000:8.2f} ms")
 
     if corners is not None:
-        print(f"\n[INFO] Document corners (TL→TR→BR→BL):")
+        print("\n[INFO] Document corners (TL→TR→BR→BL):")
         for i, pt in enumerate(corners):
             print(f"  pt{i}: ({pt[0]:.1f}, {pt[1]:.1f})")
 
