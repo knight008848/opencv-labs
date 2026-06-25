@@ -155,3 +155,65 @@ def create_color_mask(hsv_img: np.ndarray, color_name: str) -> np.ndarray:
         m = cv2.inRange(hsv_img, lower, upper)
         mask = m if mask is None else cv2.bitwise_or(mask, m)
     return mask
+
+
+# --- HEIC / non-standard format I/O ---
+
+def read_heic(path: str | Path) -> np.ndarray | None:
+    """Read a HEIC image as an OpenCV BGR array.
+
+    Requires ``pip install pillow-heif --break-system-packages`` in the
+    pydata environment.  Without it the function prints instructions and
+    returns None so your pipeline can fall back gracefully.
+
+    Args:
+        path:  Path to a .heic / .heif file.
+
+    Returns:
+        BGR uint8 array on success, or None if the dependency is missing
+        or the file can't be read.
+    """
+    try:
+        import pillow_heif
+        from PIL import Image
+
+        # pillow_heif must register its decoder with Pillow
+        pillow_heif.register_heif_opener()
+        pil_img = Image.open(str(path)).convert("RGB")
+        return cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+
+    except ImportError:
+        print(
+            "[read_heic] pillow-heif is not installed.\n"
+            "  Run:  pip install pillow-heif --break-system-packages\n"
+            "  Or convert manually: python tools/convert_heic.py"
+        )
+        return None
+    except Exception as exc:
+        print(f"[read_heic] Failed to read {path}: {exc}")
+        return None
+
+
+def any_image_reader(path: str | Path) -> np.ndarray | None:
+    """Try to read an image regardless of format (HEIC, JPG, PNG, …).
+
+    Tries HEIC first (if file extension matches), falls back to
+    ``cv2.imread`` for standard formats.
+
+    Args:
+        path:  Path to an image file.
+
+    Returns:
+        BGR uint8 array, or None if every attempt failed.
+    """
+    path = Path(path)
+    suffix = path.suffix.lower()
+
+    if suffix in {".heic", ".heif", ".heics"}:
+        result = read_heic(path)
+        if result is not None:
+            return result
+        # fall through to cv2.imread (which will also fail, but at least
+        # we tried with a useful error message)
+
+    return cv2.imread(str(path))
