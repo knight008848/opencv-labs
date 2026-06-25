@@ -203,9 +203,30 @@ def find_largest_quadrilateral(edges: np.ndarray) -> np.ndarray | None:
     if candidates:
         best = max(candidates, key=lambda x: x[0])
         print(f"[find_largest_quadrilateral] Found quad with area={best[0]:.0f} px")
-        return best[1]
+        ordered = _order_corners_tl_tr_br_bl(best[1])
+        return ordered
     print("[find_largest_quadrilateral] No quadrilateral contours found.")
     return None
+
+
+def _order_corners_tl_tr_br_bl(pts: np.ndarray) -> np.ndarray:
+    """Re-order 4 arbitrary contour points into TL→TR→BR→BL order.
+
+    Strategy: sort by y (top vs bottom), then within each row sort
+    by x (left vs right).  Works for documents rotated less than ~45°.
+
+    Args:
+        pts: float32 (4, 2) array in arbitrary contour order.
+
+    Returns:
+        float32 (4, 2) array ordered TL, TR, BR, BL.
+    """
+    sorted_by_y = pts[np.argsort(pts[:, 1])]
+    top_two = sorted_by_y[:2]
+    bottom_two = sorted_by_y[2:]
+    tl, tr = top_two[np.argsort(top_two[:, 0])]
+    bl, br = bottom_two[np.argsort(bottom_two[:, 0])]
+    return np.float32([tl, tr, br, bl])
 
 
 # ---------------------------------------------------------------------------
