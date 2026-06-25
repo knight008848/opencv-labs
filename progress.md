@@ -5,11 +5,11 @@
 ## 当前状态
 
 - **开始日期：** 2026-06-09
-- **当前天数：** Day 13 / 30
-- **当前模块：** 模块 6 — 边缘检测（已完成，测验 5/6 + 组合 Pipeline）
-- **完成率：** 43%
+- **当前天数：** Day 14 / 30
+- **当前模块：** 阶段测试 2 完成（87%），进入 Week 3
+- **完成率：** 47%
 - **最终项目：** 具身视觉数据管道（MP4 -> 结构化观察数据）
-- **累计编码时间：** ~15 小时
+- **累计编码时间：** ~15.5 小时
 
 ---
 
@@ -25,16 +25,120 @@
 | 06-16 | Day 5 | 模块 3 | 3/3 | 100% (5/5) | ~1h | addWeighted 混合 + absdiff 差异检测 |
 | 06-17 | Day 6 | 模块 3 | 3/3 | - | ~1.5h | HSV inRange 5色过滤 + findContours 物体计数 |
 | 06-17 | Day 7 | 阶段测试 1 | - | 86% (6/7) | ~0.5h | 模块 1-3 综合测试 |
-| 06-18 | Day 8 | 模块 4 | 1/1 | - | ~1h | letterbox 批量预处理 224×224 |
+| 06-18 | Day 8 | 模块 4 | 1/1 | - | ~1h | letterbox 批量预处理 224x224 |
 | 06-18 | Day 9 | 模块 4 | 1/1 | 50% (2.5/5) | ~1.5h | safe_rotate + 金字塔，模块测验 |
 | 06-22 | Day 10 | 模块 5 | 1/1 | 80% (4/5) | ~1h | 透视变换4点矫正 + ginput交互 + 逆warp合成测试图 |
 | 06-22 | Day 11 | 模块 5 | 1/1 | 83% (5/6) | ~1h | 6合1滤波对比 + Canny边缘保留度 + benchmark耗时排序 |
 | 06-23 | Day 12 | 模块 6 | 1/1 | 83% (5/6) | ~1.5h | Sobel/Canny/Laplacian 边缘检测 + Canny 阈值扫描 + 自动 Canny |
-| 06-25 | Day 13 | 模块 6 | 1/1 | - | ~1.5h | 组合 Pipeline：中值→高斯→Canny→四边形→透视矫正 |
+| 06-24 | Day 13 | 模块 6 | 1/1 | - | ~1.5h | 组合 Pipeline：中值去噪 -> 高斯平滑 -> Canny -> 最大四边形 -> 透视矫正 |
+| 06-24 | Day 14 | 阶段测试 2 | - | 87% (8.7/10) | ~0.5h | 模块 4-6 综合测试 |
 
 ---
 
 ## 每日学习日志
+
+### Day 14 (2026-06-24) — 阶段测试 2（模块 4-6 综合）
+
+**完成事项：**
+- [x] 阶段测试 2：8.7/10 (87%)
+- [x] 选择题 4/4 全对
+- [x] 代码补全 2/2 全对
+- [x] 实战题 Q7 部分正确（2/3）
+
+**错题：**
+- Q7 [K] — edge_preserve 场景推荐了 Canny，正解是双边滤波。Canny 是边缘检测器（输出二值图），双边滤波才是去噪同时保留边缘的滤波器。Canny 找边缘，双边滤波保护边缘——输入输出和目标都不同。
+
+**Week 2 薄弱点回顾：**
+- 模块 4 测验 50%（仿射包含平移 [K] + 画布裁切 [C] + aliasing 术语 [E]）——已在 Day 10 费曼推导中补强
+- 模块 5 测验 83%（三点共线 [K] + sigma 术语 [E]）——已改善
+- 模块 6 测验 83%（Sobel 方向映射 [K] + 看错题 [E]）——Sobel X/Y 方向已纠正
+
+**复盘三问：**
+1. Canny vs 双边滤波的区别是什么？Canny 输出边缘二值图（黑白线），双边滤波输出平滑去噪图（保留原图内容）。前者找边缘，后者保护边缘。
+2. Q1-Q6 为什么全对？INTER_AREA 缩小/插值选择、仿射=透视特例/三点不共线、Sobel X=垂直边缘、Canny 滞后阈值、warpPerspective/medianBlur/GaussianBlur API——Day 8-13 反复练习已扎实。
+3. Week 2 最大的收获是什么？从单一操作（旋转、滤波）到组合 Pipeline（中值->高斯->Canny->透视），学会了把独立函数串成端到端流程。这才是最终项目所需要的思维方式。
+
+### Day 13 (2026-06-24) — 组合 Pipeline：滤波->边缘->透视
+
+**完成事项：**
+- [x] 合成含噪倾斜文档测试图（make_test_document 复用）
+- [x] 中值滤波去椒盐噪声（medianBlur ksize=5）
+- [x] 高斯模糊进一步平滑（GaussianBlur ksize=5）
+- [x] Canny 边缘检测提取文档四边
+- [x] findContours 找最大四边形轮廓
+- [x] approxPolyDP 逼近四角
+- [x] getPerspectiveTransform + warpPerspective 透视矫正
+- [x] 输出灰度图 + 边缘图并排对比
+
+**复盘三问：**
+1. Pipeline 5 个步骤的中间结果是什么？中值->椒盐噪声消失但保留边缘模糊；高斯->进一步平滑减少假边缘；Canny->白线边缘清晰但可能有噪点；最大四边形->书的四角坐标；透视矫正->正矩形俯视视角。
+2. 哪个步骤最容易失败？approxPolyDP 的 epsilon 参数——太大将四边形逼近成三角形，太小保留过多噪声顶点。0.02x周长是经验起点。
+3. 这条 Pipeline 和最终项目的关系？架构完全一致：逐帧处理->ROI分析->结构化输出。Day 13 Pipeline 是最终项目在单帧文档场景下的缩影。
+
+### Day 12 (2026-06-23) — 边缘检测实验室
+
+**完成事项：**
+- [x] sobel_edges() — CV_64F -> magnitude -> convertScaleAbs 三向梯度
+- [x] laplacian_edges() — 刻意不模糊展示裸 Laplacian 的噪点敏感性
+- [x] canny_edges() — GaussianBlur -> Canny 标准管线
+- [x] auto_canny() — medianx0.66 / medianx1.33 自动阈值
+- [x] run_edge_benchmark() — 10 检测器计时 + Canny(50,150) 复用
+- [x] build_edge_report() — GridSpec 2x5 对比图
+- [x] 模块 6 测验：5/6 (83%)
+
+**错题：**
+- Q1 [E] -> 选 B（一定是边缘），正解 C（弱边缘看滞后连接）。看错题——梯度 120 卡在 50 和 150 之间，是 weak edge。
+- Q2 [K] -> Sobel X 检测垂直边缘，Sobel Y 检测水平边缘。把算子方向和边缘方向搞反了。
+
+**复盘三问：**
+1. Sobel X 为什么检测垂直边缘？Sobel X 算的是"右边减左边"（沿 X 轴的变化率），亮度沿 X 方向跳变的像素排列恰好是竖线。
+2. Canny 滞后连接为什么不用一刀切？双阈值把像素分成三档——强/弱/非——弱边缘必须挂在强边缘上才能活，既干净又连续。
+3. Laplacian 真正的用武之地？图像锐化——原图减去 Laplacian 拉大边缘对比度，不是边缘检测。
+
+### Day 11 (2026-06-22) — 滤波器对比实验室
+
+**完成事项：**
+- [x] apply_filter() — dispatch dict 分发 Gaussian/Median/Bilateral/Mean 四种滤波器
+- [x] count_canny_edges() — BGR->GRAY->Canny->countNonZero 边缘保留度量
+- [x] run_filter_benchmark() — perf_counter 计时，每次从 original 出发避免串扰
+- [x] build_filter_report() — GridSpec 3x3 报告图 + 底部 bar chart
+- [x] 模块 5 测验：5/6 (83%)
+
+**关键发现：**
+- 双边滤波边缘保留率 98.2% 但耗时 47.1ms——不可分离卷积 + 每像素 exp 运算是代价
+- 中值滤波对椒盐噪声的清洗效果明显优于同等耗时的高斯 5x5
+- 高斯 15x15 边缘仅保留 5.3%，核变大边缘损耗指数级增长
+
+### Day 10 (2026-06-22) — 透视变换 4 点矫正
+
+**完成事项：**
+- [x] 费曼学习法拆解透视变换、高斯/中值/双边滤波三个概念
+- [x] plt.ginput 交互选 4 个文档角 + 中键撤销
+- [x] getPerspectiveTransform + warpPerspective 矫正
+- [x] 透视变换测验：4/5 (80%)
+
+**错题：**
+- Q2 [K] -> 4 个源点的几何约束选了"必须顺时针"而非"三点不共线"。顺时针只是习惯，三点共线才会导致方程线性相关报错。
+
+### Day 9 (2026-06-18) — 仿射变换 + 图像金字塔
+
+**完成事项：**
+- [x] safe_rotate() — warpAffine 旋转 + 自动扩画布
+- [x] build_pyramid() + build_pyramid_collage()
+- [x] build_rotation_collage() — 0-330 每 30 旋转
+- [x] 模块 4 测验：2.5/5 (50%)
+
+**错题：**
+- Q3 [K] -> 仿射变换包含平移变换（不是互不包含）。仿射 = 线性变换 + 平移。
+- Q4 [C] -> 旋转 45 画布不变一定会裁内容。对角线 = 边长x/2 > 边长。
+- Q5 [E] -> 方向对但缺关键术语"混叠效应（aliasing）"。
+
+### Day 8 (2026-06-18) — 图像缩放与 letterbox
+
+**完成事项：**
+- [x] letterbox_resize() — 保持纵横比缩放 + 黑色居中填充
+- [x] process_batch() — 批量处理 + 统计收集
+- [x] 8/8 输出严格 224x224，无拉伸变形
 
 ### Day 7 (2026-06-17) — 阶段测试 1（模块 1-3 综合）
 
@@ -42,270 +146,51 @@
 - [x] 阶段测试 1：6/7 (86%)
 - [x] 选择题 4/4 全对
 - [x] 代码补全 2/2 全对
-- [ ] 实战题 Q7 未通过（见下面分析）
+- [ ] 实战题 Q7 未通过
 
 **错题：**
-- Q7 [E] + [A] — 实战题 diagnose_exposure() 三个问题：
-  1. 语法错误：`img_hsv[;;3]`（双分号）、引用不存在的变量 `gray`
-  2. 未按题目给定的阈值规则实现——用了 Day 4 的更复杂 bimodal 算法，而不是题目指定的 p5/p50/p95 简单三路分支
-  3. 返回值和题目要求的接口签名不完全一致
-
-**复盘三问：**
-1. Q7 为什么出错？题目给了明确的规则（p50<60 或 p95<150→欠曝），我却用自己记得的 Day 4 逻辑替换了。做题不是做工程——先读题、用题目给的条件、不要自作主张优化。
-2. Q1-Q6 为什么全对？shape 维度、addWeighted 饱和截断、红色 H 跨环、HSV 均衡化、threshold API、findContours API——这些经过 Day 1-6 反复练习已经扎实。
-3. Week 1 最大的收获是什么？知道了 OpenCV 的"性格"：BGR 不是 RGB、HSV 解耦优于直接操作 BGR 通道、所有运算前先问自己"要不要 copy"。
-
-### Day 13 (2026-06-25) — 滤波+边缘+透视组合 Pipeline
-
-**完成事项：**
-- [x] `denoise_median()` — 中值滤波去除椒盐噪声
-- [x] `smooth_gaussian()` — 高斯模糊进一步平滑
-- [x] `extract_edges()` — Canny 边缘检测 + 边缘密度打印
-- [x] `find_largest_quadrilateral()` — RETR_EXTERNAL + approxPolyDP 筛选4顶点 + 最大面积
-- [x] `warp_document()` — getPerspectiveTransform + warpPerspective 透视矫正
-- [x] `build_combo_report()` — 2×3 报告图（原图/去噪/边缘+四边形叠层/矫正图/矫正边缘/状态）
-- [x] `add_salt_pepper_noise()` — 三段式 mask 椒盐噪声 (ADD_NOISE=False 默认关闭)
-- [x] 完整 Pipeline 6 步 + 每步计时 + corners=None 兜底
-
-**自我练习完成的函数：**
-- `denoise_median` ✅ `smooth_gaussian` ✅ `extract_edges` ✅ `add_salt_pepper_noise` ✅
-- `find_largest_quadrilateral` ✅ `warp_document` ✅ `main()` 串联 ✅
-
-**关键发现：**
-- `findContours` 返回的 contours 是 `(N, 1, 2)` 格式，需 `reshape(4, 2)` 才能得到 `(4, 2)` 四边形坐标
-- `approxPolyDP` 的 epsilon 用 `0.02 * arcLength` 是个好起点——太大会把四边形压成三角形，太小会保留多余顶点
-- `add_salt_pepper_noise` 的初级 bug：`mask >= prob/2` 会染黑 99% 的像素，正确做法是 `(mask >= prob/2) & (mask < prob)`
-
-**复盘三问：**
-1. 为什么先中值滤波再高斯模糊，顺序能换吗？不能。中值滤波去掉离散的椒盐点，高斯平滑去掉残留的纹理噪点——如果顺序反了，高斯先晕开会把椒盐的"椒"和"盐"扩散成大块模糊区域，中值再也救不回来。
-2. 为什么在透视矫正之后还要对矫正图再做一次Canny？不是为了再找四边形，而是为了验证矫正后文档边缘干净（矫正图的边缘应该是完整的文字轮廓，没有倾斜伪影）。
-3. findContours 用 RETR_EXTERNAL 和 RETR_LIST 的区别？EXTERNAL 只取最外层轮廓（文档边框），LIST 取所有层级（文字笔画也算）。对于文档扫描场景，EXTERNAL 就够了。
-
-### Day 12 (2026-06-23) — 边缘检测实验室
-
-**完成事项：**
-- [x] `sobel_edges()` — CV_64F → magnitude → convertScaleAbs 三向梯度
-- [x] `laplacian_edges()` — 刻意不模糊展示裸 Laplacian 的噪点敏感性
-- [x] `canny_edges()` — GaussianBlur → Canny 标准管线
-- [x] `auto_canny()` — median×0.66 / median×1.33 自动阈值
-- [x] `run_edge_benchmark()` — 10 检测器计时 + Canny(50,150) 复用
-- [x] `build_edge_report()` — GridSpec 2×5 对比图
-- [x] `_make_test_document()` — 合成倾斜文档测试图（代 Day 10 透视变换）
-- [x] 模块 6 测验：5/6 (83%)
-
-**测验结果：**
-- Q1 [E] → 选 B（一定是边缘），正解 C（弱边缘看滞后连接）。**看错题**——梯度 120 卡在 50 和 150 之间，是 weak edge，不是看不懂 hysteresis。
-- Q2 [K] → **Sobel X 检测垂直边缘，Sobel Y 检测水平边缘**。把算子方向（梯度沿哪个轴算）和边缘方向（边本身怎么走）搞反了。这是 Day 12 最核心的误区，用"导盲杖左右敲到竖桌边"的类比纠正。
-- Q3/Q4/Q5 全对。
-
-**薄弱点改善：**
-- Day 4 薄弱点"仿射数学直觉"未直接覆盖，但在 Q5 简答中自然用到了梯度方向概念
-- Q1 从 [C] 改为 [E]（看错题≠不懂概念），hysteresis 理解正确，后续不需要补习
-
-**复盘三问：**
-1. Sobel X 为什么检测垂直边缘而不是水平边缘？因为 Sobel X 算的是"右边减左边"（沿 X 轴的变化率），亮度沿 X 方向跳变的像素排列恰好是竖线。类比：闭眼从左往右摸桌面，手指摸到桌边悬空时——摸的方向是水平的，但摸到的桌边是垂直的。
-2. Canny 的滞后连接（hysteresis）为什么不用一刀切？一刀切会陷入"阈值低了满图噪点、阈值高了边缘断开"的两难。双阈值把像素分成三档——强/弱/非——弱边缘必须挂在强边缘上才能活，这让检测结果既干净又连续。
-3. Laplacian 真正的用武之地是什么？不是边缘检测，是图像锐化——原图减去 Laplacian 拉大边缘对比度。裸 Laplacian 对噪点过度敏感（二阶导放大微小抖动），工程中几乎不直接使用。
-
-### Day 11 (2026-06-22) — 滤波器对比实验室
-
-**完成事项：**
-- [x] `apply_filter()` — dispatch dict 分发 Gaussian/Median/Bilateral/Mean 四种滤波器
-- [x] `count_canny_edges()` — BGR→GRAY→Canny→countNonZero 边缘保留度量
-- [x] `run_filter_benchmark()` — perf_counter 计时，每次从 original 出发避免串扰
-- [x] `build_filter_report()` — GridSpec 3×3 报告图（2×3 图像 + 底部 bar chart 排序标注）
-- [x] `_make_test_filter_image()` — 合成测试图（彩色矩形 / 径向渐变 / 细字 / 2% 椒盐噪声）
-- [x] 6 种滤波耗时排序 + Canny 边缘保留度排序
-- [x] 模块 5 测验：5/6 (83%)
-
-**关键发现：**
-- 双边滤波边缘保留率 98.2%（46,204 vs 原图 47,055），但耗时 47.1ms——**不可分离卷积 + 每像素 exp 运算**是代价
-- 高斯 15×15 边缘仅保留 5.3%，代价是极强模糊——核变大，边缘损耗指数级增长
-- 中值滤波耗时 10.6ms，对椒盐噪声的清洗效果明显优于同等耗时的高斯 5×5
-- 均值滤波 9.6ms，边缘保留比高斯 5×5 差（5,118 vs 10,516）——中心加权确实有效
-
-**薄弱点发现：**
-- 双边滤波的 sigmaColor/sigmaSpace 参数名写成了「颜色距离」「空间距离」——概念对但术语不准，API 名称以 sigma 为前缀
-
-**复盘三问：**
-1. 为什么高斯 15×15 比 5×5 快？15×15 的核大但 sigma=0 时 OpenCV 用了分离卷积（先水平再垂直），实际运算量从 O(k²) 降到 O(2k)。5×5 在小核上分离的启动开销占比大，而大核的分离优势更明显。同时 benchmark 噪声（单次测量）也可能导致排序波动。
-2. 双边滤波为什么不能分离？因为权重依赖颜色差而不是纯空间位置——每个像素邻域的颜色分布不同，预计算核不成立。不能先走 X 再走 Y。
-3. 中值滤波为什么比均值滤波慢但边缘更好？中值需要排序（O(k² log k²)），均值只需加法。但中值只选一个代表性的值（中位数），极值噪点被彻底消除；均值被极值污染。椒盐场景中值完胜。
-
-### Day 10 (2026-06-22) — 透视变换 4 点矫正
-
-**完成事项：**
-- [x] 费曼学习法拆解透视变换、高斯/中值/双边滤波三个概念
-- [x] 费曼推导仿射变换 2×3 矩阵的 6 个数字几何直觉（补 Day 9 薄弱点）
-- [x] `pick_four_points()` — plt.ginput 交互选 4 个文档角 + 中键撤销
-- [x] `compute_warp_matrix()` — getPerspectiveTransform 构造 3×3 单应矩阵
-- [x] `apply_perspective_warp()` — warpPerspective + BORDER_CONSTANT
-- [x] `build_comparison_figure()` — 原图红框标注 + 矫正图并排
-- [x] `_make_test_document()` — 反向 warped 合成测试图（带文书纹理 + 水印）
-- [x] `INPUT_IMAGE` 不存在时自动生成并保存，下次直接加载
-- [x] 路径基于 `__file__` 解析，不限工作目录
-- [x] 透视变换测验：4/5 (80%)
-
-**错题：**
-- Q2 [K] → 4 个源点的几何约束选了「必须顺时针」而非「三点不共线」。顺时针只是习惯，排列方向不影响数学成立；但三点共线会导致方程线性相关，OpenCV 直接报错。
-
-**薄弱点发现：**
-- 透视变换与仿射变换的关系还需强化——仿射是透视的特例（第三行固定为 [0,0,1]）
-
-**复盘三问：**
-1. 透视变换比仿射变换多了什么？仿射 2×3 保持平行线不变（平行四边形→平行四边形），透视 3×3 可以改变平行性（梯形→矩形）。本质区别：仿射矩阵的第三行永远是 [0,0,1]，透视的第三行 [g,h,1] 中 g,h 可以为非零——它们就是「近大远小」的数学编码。
-2. 为什么合成测试图用反向 warp？（即先画好平面文书→反推出投影→贴到斜视角）而不是直接画斜线？因为正向画立体的文字太难——反向 warp 能把平面对齐的排版一次性注入斜视角，效果逼真得多。用了这个技巧才让 `_make_test_document` 看起来像真实照片。
-3. ginput 和 plt.show() 的关系是什么？ginput 内部自动触发交互模式，不用也不能提前 show——先 show 再 ginput 会导致窗口已关闭或失焦。
-
-### Day 9 (2026-06-18) — 仿射变换 + 图像金字塔
-
-**完成事项：**
-- [x] `safe_rotate()` — warpAffine 旋转 + 自动扩画布（新画布公式 + M 平移修正 + 浮点精度 epsilon）
-- [x] `_rotated_canvas_size()` — 抽公共方法，safe_rotate 和 print_rotation_stats 共享
-- [x] `build_pyramid()` — pyrDown 循环，`min(side) // 2 >= 64` 终止条件
-- [x] `build_pyramid_collage()` — 每层 resize 回原尺寸 + 标签展示逐级模糊
-- [x] `build_rotation_collage()` — 0°-330° 每 30° 旋转 + stitch_horizontal 拼贴
-- [x] `stitch_horizontal()` — 灰度兼容 + 等高补齐 + 标签绘制
-- [x] `print_rotation_stats()` — 终端预计算角度-画布-膨胀率
-- [x] 模块 4 测验：2.5/5 (50%)
-
-**错题：**
-- Q3 [K] → **仿射变换包含平移变换**（不是互不包含）。仿射 = 线性变换 + 平移，2×3 矩阵中平移分量 `M[:,2]` 用单位矩阵线性部分就是纯平移。平移是仿射的子集。
-- Q4 [C] → **旋转 45° 画布不变一定会裁内容**。对角线 = 边长×√2 > 边长，safe_rotate 存在的意义就是为了避免这个。
-- Q5 [E] → 方向对（细节丢失）但缺关键术语**混叠效应（aliasing）**——高斯模糊去高频分量再下采样，避免锯齿/波纹。
-
-**薄弱点发现：**
-- 仿射变换的数学直觉偏弱——知道怎么用 `getRotationMatrix2D` 但没建立「仿射 = 线性 + 平移」的结构性理解
-- 问题出在没把 2×3 矩阵的 6 个数字跟几何意义对应起来
-
-**复盘三问：**
-1. 今天 safe_rotate 的核心难点在哪？不是 `getRotationMatrix2D`（OpenCV 替你做了），而是旋转后四角坐标变了——必须用 `h·|sinθ| + w·|cosθ|` 先算新画布再平移旋转中心。这个公式今天用 1200×1200 正方形测了 12 个角度，45° 对角线 1697 验证了 √2 倍的膨胀。
-2. pyrDown 和 resize 都能缩小，什么时候用哪个？pyrDown 自带高斯模糊 + 丢弃行列——快、有模糊保证、但尺寸严格减半。resize 更灵活（任意目标尺寸、自由选插值）。做金字塔用 pyrDown（专业），做 letterbox 用 resize（需要精确控制）。
-3. 为什么 pydata 里的 `pyc` 缓存会污染运行结果？Python 3.10 在 `__pycache__` 里存了旧版本 .pyc，修改源文件后如果 .pyc 时间戳没更新就会被沿用。解决方案：`-B` 禁 bytecode 或删缓存。今天 180° 1201 vs 1200 就是这个坑。
-
-### Day 8 (2026-06-18) — 图像缩放与 letterbox
-
-**完成事项：**
-- [x] `letterbox_resize()` — 保持纵横比缩放 + 黑色居中填充
-- [x] `collect_images()` — 多后缀扫描 (jpg/png)
-- [x] `process_batch()` — 批量处理 + 统计收集
-- [x] `print_results()` — 终端打印原尺寸/scale/padding
-- [x] 生成 8 张合成测试图（覆盖 4:3、3:4、16:9、5:2、1:1、极小、超大）
-- [x] 8/8 输出严格 224×224，无拉伸变形
-
-**薄弱点发现：**
-- `rglob` 返回生成器不能用 `+` 拼接 → 已解决（列表推导）
-- `round()` 可能导致缩放后尺寸超 target 1 像素 → 用 `int()` 截断更安全
-
-**复盘三问：**
-1. resize 参数顺序是 `(宽, 高)` 但 shape 是 `(高, 宽)`——今天记住了吗？骨架上特意标了注释 `TARGET_SIZE = (224, 224)  # (width, height)`，`letterbox_resize` 内部也统一了顺序，没被坑。
-2. INTER_AREA vs INTER_CUBIC 的选择策略？缩小用 AREA（无摩尔纹），放大用 CUBIC（看周围 16 邻居猜）。缩小是去掉冗余信息（平均），放大是补出不存在的信息（插值）。
-3. letterbox 最终项目里用在哪？视频每一帧标准化到固定尺寸 → 送入 ROI 分析。如果原图比模型输入大（常态），letterbox 在降采样同时保留全貌。
+- Q7 [E]+[A] — 语法错误 + 未用题目给定阈值，用 Day 4 bimodal 算法替代
 
 ### Day 6 (2026-06-17) — HSV 色彩空间与 inRange 颜色过滤
 
 **完成事项：**
-- [x] hsv_presets() — 5 种颜色的 HSV 预设字典（红双区间 / 绿蓝黄白单区间）
-- [x] apply_color_filter() — BGR→HSV→inRange×N→bitwise_or 合并多区间
-- [x] extract_objects() — bitwise_and 掩膜提取
-- [x] count_objects() — findContours + contourArea 过滤 + 计数
-- [x] build_filter_report() — GridSpec 5×3 报告图
-- [x] print_summary() — 终端打印每色物体数 + 覆盖率
-- [x] 用 Day06-00.png（5色场景）验证全部 5 种颜色
-- [x] 红色 S 下限收紧至 150 以减少低饱和误检，V 下限收紧至 120
-- [x] 黄色 H 上限从 35 放宽到 40 以覆盖橘黄交界
-
-**薄弱点改善：**
-- Day 4 薄弱点"彩色均衡化：为什么是 HSV-V 而非 BGR 分通道"→ Day 6 全程在 HSV 空间操作，已形成直觉
-
-**复盘三问：**
-1. 红色为什么需要两段 inRange？色相是环状的（0°=360°），红色正好跨了 0° 分界，OpenCV 把 0-360 压缩到 0-179，红色落在 [0,10] 和 [160,179] 两个不连续的区间。
-2. 白色怎么过滤？靠 S 低 V 高——S<20 表示灰度（无色彩），V>230 表示很亮。H 无所谓（0-179 全开）。
-3. count_objects 的 min_area=500 对小物体可能太粗暴，对粘连物体又解决不了——min_area 是粗过滤，真正的物体分离需要 morphology（erode/dilate）。
+- [x] hsv_presets() — 5 种颜色的 HSV 预设字典
+- [x] apply_color_filter() + extract_objects() + count_objects()
+- [x] build_filter_report() — GridSpec 5x3 报告图
 
 ### Day 5 (2026-06-16) — 图像混合与差异检测
 
 **完成事项：**
-- [x] blend_images() — cv2.addWeighted alpha 混合，α+β=1
-- [x] difference_map() — cv2.absdiff + cv2.threshold(30) 过滤噪声 + 变化率计算
-- [x] build_blending_report() — GridSpec 2×3 报告图（3 个 alpha 节点 + 差异 JET 热力图）
-- [x] 两张 2160×3840 同尺寸图，无需 resize，change_ratio=5.76%
-- [x] Day 5 测验：5/5 (100%) — blending 专项测验
-
-**复盘三问：**
-1. addWeighted 的权重从哪来？没有标准公式——透明度混合用 α+β=1，HDR 融合按局部区域动态计算，水印叠加写死 9:1。权重由具体任务决定。
-2. 为什么要 threshold(30) 过滤？两张现实照片即使内容完全一样，传感器噪声和光线微动也会产生 1~5 的像素差。不设阈值的话 diff_thresh 全是"变化"，没有意义。
-3. 本模块如何用在最终项目？连续帧做 absdiff → change_ratio 突变 → 触发"操作台有新物体"事件 → 对该帧做 ROI 分析 + 物体识别。
+- [x] blend_images() — cv2.addWeighted alpha 混合
+- [x] difference_map() — cv2.absdiff + threshold(30) 过滤噪声
+- [x] Day 5 测验：5/5 (100%)
 
 ### Day 4 (2026-06-15) — 直方图计算与均衡化
 
 **完成事项：**
-- [x] cv2.calcHist vs np.histogram 一致性验证（diff=0，注意 shape 差异）
-- [x] 合成渐变图（0→80）均衡化实验——验证 CDF 拉伸原理
-- [x] assess_exposure() — 百分位数决策链（p75/p25/p50 三重判断，覆盖 bimodal 场景）
-- [x] equalize_color() — HSV 空间只调 V 通道，保持色相不变
-- [x] build_histogram_figure() — 3 格报告图（fill_between 半透明叠加直方图）
+- [x] cv2.calcHist vs np.histogram 一致性验证
+- [x] assess_exposure() — 百分位数决策链
+- [x] equalize_color() — HSV 空间只调 V 通道
 - [x] Day 4 测验：4.5/5 (90%)
-
-**错题：**
-- Q5 [E] — 答"只能调 V 通道"，把"不应该"讲成了"不能"。正确理由：BGR 三通道独立均衡化会破坏通道间比例导致颜色失真，而 HSV 将颜色与亮度解耦所以安全。
-
-**薄弱点发现：**
-- 曝光判断用均值 vs 百分位数的选择——mean=55.8 但三通道直方图分布在 [4,242] 属于正常场景，mean 有误导性；百分位数（p50/p75）更鲁棒
-- BGR 三通道独立均衡化虽然技术上能跑（split→各自equalize→merge），但结果偏色——这是理解 HSV 解耦价值的反面案例
-
-**复盘三问：**
-1. 直方图均衡化一定让图片变好看吗？不——如果原图曝光正常，均衡化会过度拉伸对比度导致看起来"脏"。均衡化是救急工具，不是美颜滤镜。
-2. 曝光评估为什么用百分位数不用均值？均值会被极端像素绑架（一张图里有几盏灯就把均值拉高）。p50（中位数）不受离群值影响，p75/p25 还能捕捉分布形状。
-3. 本模块学到的技术如何用在最终项目？视频每一帧做曝光评估→如果连续 N 帧欠曝→触发均衡化预处理→再送入 ROI 分析。这是管道里的"自动亮度归一化"环节。
 
 ### Day 3 (2026-06-11) — ROI 切片与九宫格
 
 **完成事项：**
-- [x] 中心 500x500 ROI 提取 + 验证共享内存（涂红原图跟着变）
-- [x] 3x3 九宫格切分（整除丢弃边角像素）
-- [x] np.random.permutation 随机打乱 9 块
-- [x] cv2.copyMakeBorder 9 色边框
-- [x] np.hstack + np.vstack 拼接
+- [x] 中心 500x500 ROI + 共享内存验证
+- [x] 3x3 九宫格 + permutation + copyMakeBorder + 拼接
 - [x] Day 3 测验：4/5 (80%)
-
-**错题：**
-- Q3 [E] — 题目问"每块尺寸"，只答了"没有丢弃像素"没给具体数值。应该答 720x1280。不是不会算，是没读完题。
-
-**薄弱点发现：**
-- 图片宽高不能整除时，丢弃边角 vs copyMakeBorder REFLECT 填充的选择——Day 2 的"整数整除"侥幸通过了，换成非整除数需要处理
-
-**复盘三问：**
-1. ROI 是视图不是副本——省内存（零拷贝）但会污染原数据，需要修改时必须 .copy()
-2. copyMakeBorder 是扩画布（像素加在外围），ROI 切片是开窗口（在原图内部）。本质区别：一个扩，一个缩
-3. 九宫格等分→多ROI划分：把 h//3*i 换成手动标定的物理坐标（传送带入口、操作区、全景），每块跑不同策略
 
 ### Day 2 (2026-06-11) — 色彩空间与通道操作
 
 **完成事项：**
-- [x] BGR/RGB/HSV/Gray 四种色彩空间转换 (cvtColor)
-- [x] cv2.split() 通道拆分 + 观察各通道亮度分布
-- [x] applyColorMap() 伪彩色映射 (JET/HOT/BONE)
-- [x] 灰度化后文件大小缩减百分比计算
-- [x] 4合1对比图 + 3 colormap 对比图（matplotlib）
+- [x] BGR/RGB/HSV/Gray 转换 + split + applyColorMap
 - [x] Day 2 测验：5/5 (100%)
-
-**薄弱点改善：**
-- Day 1 薄弱点 (BGR 通道索引 [K]) — Q4 正确选 A，BGR 顺序已形成肌肉记忆
 
 ### Day 1 (2026-06-10) — 像素矩阵探索
 
 **完成事项：**
-- [x] 从 MP4 提取帧 (cap.set + seek + read)
-- [x] 探索图像矩阵：shape / dtype / size / 像素访问
-- [x] 三通道均值统计
-- [x] top-5 最亮像素定位 (np.argpartition + unravel_index)
-- [x] 水印叠加 (cv2.putText)
+- [x] MP4 提取帧 + shape/dtype/size + top-5 最亮像素 + 水印
 - [x] Day 1 测验：3/5 (60%)
-
-**错题：**
-- Q2 [K] — COLOR_BGR2RGB vs COLOR_GRAY2BGR 搞混
-- Q4 [K] — shape 是 (高, 宽) 不是 (宽, 高)
 
 ### Day 0 (2026-06-09) — 环境准备
 
@@ -322,12 +207,13 @@
 |:---|:---|:---|:---|:---|:---|:---|:---|
 | 06-10 | 模块 1 | Q2 | COLOR_GRAY2BGR | COLOR_BGR2RGB | [K] | BGR2RGB 交换通道，GRAY2BGR 是升维 | - |
 | 06-10 | 模块 1 | Q4 | A (3840,2160,3) | C (2160,3840) | [K] | shape 永远是 (高, 宽) | - |
-| 06-11 | 模块 2 | Q3 | "没有丢弃像素" | 720x1280 | [E] | 没读完题，应该给具体尺寸 | - |
-| 06-15 | 模块 2 | Q5 | "只能调 V 通道" | BGR 分通道独立均衡化会破坏通道比例导致颜色失真，HSV 才解耦 | [E] | 理由不够精准——不是 API 不允许，是语义上不该这样做 | - |
-| 06-17 | 阶段测试 1 | Q7 | 用 Day 4 bimodal 算法代替题目规则 | p50<60 or p95<150→欠曝; p50>200 or p5>120→过曝 | [E]+[A] | 三个问题：语法错误(img_hsv[;;3]/未定义gray)、未用题目给定阈值、返回值签名不一致 | - |
-| 06-18 | 模块 4 | Q3 | 仿射和透视互换 | 仿射包含平移 | [K] | 仿射 = 线性 + 平移，2×3 矩阵包含平移分量 M[:,2] | - |
-| 06-18 | 模块 4 | Q4 | 旋转 45°不会一定裁 | 对（画布不变一定裁） | [C] | 对角线 = 边长×√2 > 边长，safe_rotate 就是为了避免裁切 | - |
-| 06-18 | 模块 4 | Q5 | 细节混在一起 | 混叠效应(aliasing) | [E] | 高频分量未经模糊直接下采样产生锯齿/波纹 | - |
+| 06-11 | 模块 2 | Q3 | "没有丢弃像素" | 720x1280 | [E] | 没读完题 | - |
+| 06-15 | 模块 2 | Q5 | "只能调 V 通道" | BGR 分通道均衡化破坏颜色比例 | [E] | 理由不够精准 | - |
+| 06-17 | 测试 1 | Q7 | Day 4 bimodal 算法 | p50<60 or p95<150 | [E]+[A] | 语法错误 + 未用题目阈值 | - |
+| 06-18 | 模块 4 | Q3 | 仿射和透视互换 | 仿射包含平移 | [K] | 仿射 = 线性 + 平移 | - |
+| 06-18 | 模块 4 | Q4 | 旋转45不会一定裁 | 对（画布不变一定裁） | [C] | 对角线 > 边长 | - |
+| 06-18 | 模块 4 | Q5 | 细节混在一起 | 混叠效应(aliasing) | [E] | 高频分量直接下采样产生锯齿 | - |
+| 06-24 | 测试 2 | Q7 | Canny（边缘检测器）| 双边滤波（边缘保留去噪）| [K] | Canny 找边缘，双边滤波保护边缘 | - |
 
 ---
 
@@ -336,11 +222,12 @@
 | 发现日期 | 概念 | 出现模块 | 错误次数 | 计划补救 | 状态 |
 |:---|:---|:---|:---|:---|:---|
 | 06-10 | shape 维度顺序 (高,宽) vs (宽,高) | 模块 1 | 1 | Day 2 加深 BGR 索引练习 | 已改善 |
-| 06-11 | 非整除图片的边角处理 | 模块 2 | 0 | Day 4 练习中刻意用非整除尺寸测试 | 已改善（Day 3 的 split_grid 用 h_aligned 策略处理） |
-| 06-15 | 曝光判断：均值 vs 百分位数选择 | 模块 2 | 0 | 后续模块中遇到亮度自适应场景时强化 | 待观察 |
-| 06-15 | 彩色均衡化：为什么是 HSV-V 而非 BGR 分通道 | 模块 2 | 1 | Day 5-6 HSV 模块会自然覆盖 | 已改善（Day 6 全程 HSV 空间操作） |
-| 06-17 | 做题时擅自"优化"题目给定的规则 | 阶段测试 1 | 1 | 下次测试前提醒：先读清题目规则，不要替换成自己更复杂的实现 | 待观察 |
-| 06-18 | 仿射变换数学直觉（2×3 矩阵 6 个数的几何意义） | 模块 4 | 1 | Day 10 前用纸笔推导：正方形四角旋转 45° 后坐标变化 → 理解新画布公式 | 待观察 |
+| 06-11 | 非整除图片的边角处理 | 模块 2 | 0 | Day 4 练习中测试非整除尺寸 | 已改善 |
+| 06-15 | 曝光判断：均值 vs 百分位数选择 | 模块 2 | 0 | 亮度自适应场景中强化 | 待观察 |
+| 06-15 | 彩色均衡化：HSV-V 而非 BGR 分通道 | 模块 2 | 1 | Day 6 HSV 模块覆盖 | 已改善 |
+| 06-17 | 做题时擅自优化题目给定规则 | 测试 1 | 1 | 下次测试前提醒 | 待观察 |
+| 06-18 | 仿射变换数学直觉（2x3 矩阵几何意义）| 模块 4 | 1 | Day 10 费曼推导补强 | 已改善 |
+| 06-24 | Canny vs 双边滤波作用混淆 | 测试 2 | 1 | Week 3 轮廓分析中区分边缘检测和滤波 | 待观察 |
 
 ---
 
@@ -348,8 +235,8 @@
 
 | 测试 | 日期 | 选择题 | 代码补全 | 实战题 | 总分 | 薄弱环节 |
 |:---|:---|:---|:---|:---|:---|:---|
-| 测试 1 (Day 7) | 06-17 | 4/4 | 2/2 | 0/1 | 6/7 (86%) | Q7 [E]+[A] — 语法错误 + 未用题目给定阈值，用 Day 4 算法替代 |
-| 测试 2 (Day 14) | - | -/4 | -/2 | -/1 | - | - |
+| 测试 1 (Day 7) | 06-17 | 4/4 | 2/2 | 0/1 | 6/7 (86%) | Q7 [E]+[A] |
+| 测试 2 (Day 14) | 06-24 | 4/4 | 2/2 | 0.67/1 | 8.7/10 (87%) | Q7 [K] Canny vs 双边滤波 |
 
 ### 模块测验成绩
 
@@ -358,11 +245,9 @@
 | 模块 1 | Day 1-2 | 80% (8/10) | BGR 通道索引 [K], shape [K] |
 | 模块 2 | Day 3-4 | 85% (8.5/10) | 非整除边角处理 [E], 均衡化理由 [E] |
 | 模块 3 | Day 5-6 | 100% (5/5) | — |
-| 模块 4 | Day 8-9 | 50% (2.5/5) | 仿射 = 线性+平移 [K], 画布不变必裁 [C], aliasing 术语 [E] |
-| 模块 5 | Day 10-11 | 83% (5/6) | 三点共线 [K], sigmaColor/sigmaSpace 术语 [E] |
-| 模块 6 | Day 12 | 83% (5/6) | Sobel X/Y 方向映射 [K], 滞后阈值看错题 [E] |
-| 测试 3 (Day 21) | - | -/4 | -/2 | -/1 | - | - |
-| 测试 4 (Day 28) | - | -/4 | -/2 | -/1 | - | - |
+| 模块 4 | Day 8-9 | 50% (2.5/5) | 仿射 = 线性+平移 [K], 画布不变必裁 [C], aliasing [E] |
+| 模块 5 | Day 10-11 | 83% (5/6) | 三点共线 [K], sigma 术语 [E] |
+| 模块 6 | Day 12 | 83% (5/6) | Sobel X/Y 方向映射 [K], 看错题 [E] |
 
 ---
 
@@ -398,49 +283,19 @@
 
 ```
 Week 1 图像基石:     7/7 天  ✓
-Week 2 图像变换:     6/7 天
+Week 2 图像变换:     7/7 天  ✓
 Week 3 图像分析:     0/7 天
 Week 4 进阶+项目:    0/9 天  (含 Day 29-30 项目冲刺)
 ----------------------------------------------
-总进度:             12/30 天
+总进度:             14/30 天
 ```
 
 ---
 
 ## 下一步计划
 
-- [x] Day 1: 模块 1 — 图像矩阵与像素操作
-- [x] Day 2: 模块 1 — 色彩空间转换（BGR/RGB/HSV/Gray）+ 通道操作
-- [x] Day 3: 模块 2 — ROI 切片操作（九宫格拼图）
-- [x] Day 4: 模块 2 — 直方图计算与均衡化
-- [x] 阅读 `docs/modules/02_roi_histogram.md` 概念 B-C
-- [x] 完成 `experiments/day_04_histogram.py`
-- [x] Day 5: 模块 3 — 图像算术与 alpha 混合（addWeighted / bitwise / mask）
-- [x] 阅读 `docs/modules/03_blending_hsv.md` 概念 A
-- [x] 完成 `experiments/day_05_blending.py`
-- [x] Day 6: 模块 3 — HSV 色彩空间与 inRange 颜色过滤
-- [x] 阅读 `docs/modules/03_blending_hsv.md` 概念 B-C
-- [x] 完成 `experiments/day_06_color_filter.py`
-- [x] Day 7: 阶段测试 1（模块 1-3 综合）→ 6/7 (86%)
-- [x] Day 8: 模块 4 — 几何变换（缩放 + letterbox）
-- [x] 阅读 `docs/modules/04_resize_affine.md` 概念 A
-- [x] 完成 `experiments/day_08_resize.py`
-- [x] Day 9: 模块 4 — 仿射变换（旋转 / warpAffine / 金字塔）
-- [x] 阅读 `docs/modules/04_resize_affine.md` 概念 B-C
-- [x] 完成 `experiments/day_09_affine.py`
-- [x] 模块 4 测验：2.5/5 (50%) — Q3/Q4 仿射概念需补强
-- [x] Day 10: 模块 5 — 透视变换（warpPerspective 4点矫正）
-- [x] 阅读 `docs/modules/05_perspective_filter.md` 概念 A
-- [x] 完成 `experiments/day_10_perspective.py`
-- [x] Day 11: 模块 5 — 滤波对比实验室（高斯 / 中值 / 双边 / 均值）
-- [x] 阅读 `docs/modules/05_perspective_filter.md` 概念 B-C
-- [x] 完成 `experiments/day_11_filters.py`
-- [x] 模块 5 测验：5/6 (83%)
-- [x] Day 12: 模块 6 — 边缘检测（Sobel / Canny / Laplacian）
-- [x] 阅读 `docs/modules/06_edge_detection.md` 概念 A-C
-- [x] 完成 `experiments/day_12_edges.py`
-- [x] 模块 6 测验：5/6 (83%)
-- [x] Day 13: 模块 6 — 组合 Pipeline
-- [x] 阅读 `docs/modules/06_edge_detection.md` Day 13 任务
-- [x] 完成 `experiments/day_13_combo.py`
-- [ ] Day 14: 阶段测试 2（模块 4-6 综合）
+- [x] Day 13: 组合 Pipeline — 中值去噪 -> 高斯平滑 -> Canny -> 最大四边形 -> 透视矫正
+- [x] Day 14: 阶段测试 2 — 87% (8.7/10)
+- [ ] Day 15: 模块 7 — 二值化（全局/自适应/Otsu）
+- [ ] 阅读 `docs/modules/07_threshold_morphology.md` 概念 A
+- [ ] 完成 `experiments/day_15_threshold.py`
