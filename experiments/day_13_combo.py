@@ -43,13 +43,13 @@ CANNY_HIGH = 150          # Canny high threshold
 OUTPUT_W = 2100
 OUTPUT_H = 2970
 
-# --- Salt-pepper noise for synthetic test image ---
-ADD_NOISE = False         # set True to inject noise (for synthetic test images only)
+# --- Salt-pepper noise (only relevant when using synthetic test image) ---
+ADD_NOISE = False         # set True to inject noise on synthetic images
 NOISE_PROB = 0.02         # 2% salt-pepper density
 
 
 # ---------------------------------------------------------------------------
-# Pipeline step 1: Add noise (only for the synthetic test image)
+# Step 1: Add noise (only for the synthetic test image)
 # ---------------------------------------------------------------------------
 
 
@@ -59,11 +59,6 @@ def add_salt_pepper_noise(img: np.ndarray, prob: float = NOISE_PROB) -> np.ndarr
     Each pixel has a probability *prob* of being replaced:
       - half the noisy pixels → white (salt)
       - half the noisy pixels → black (pepper)
-
-    This simulates the kind of noise a cheap document scanner or
-    low-light camera might produce.  The Day 13 pipeline must clean
-    this noise *before* running Canny, otherwise the edge map will
-    be dominated by false edges from noise.
 
     Args:
         img:  BGR image, uint8.
@@ -75,15 +70,14 @@ def add_salt_pepper_noise(img: np.ndarray, prob: float = NOISE_PROB) -> np.ndarr
     noisy = img.copy()
     h, w = noisy.shape[:2]
     mask = np.random.random((h, w))
-    salt_mask = mask < prob / 2
-    pepper_mask = (mask >= prob / 2) & (mask < prob)
-    noisy[salt_mask] = 255
-    noisy[pepper_mask] = 0
+    noisy[mask < prob / 2] = 255                     # salt: top half of noise band
+    noisy[(mask >= prob / 2) & (mask < prob)] = 0    # pepper: bottom half of noise band
+    # Pixels outside the noise band are left unchanged
     return noisy
 
 
 # ---------------------------------------------------------------------------
-# Pipeline step 2-3: Noise removal (median + Gaussian)
+# Step 2-3: Noise removal (median + Gaussian)
 # ---------------------------------------------------------------------------
 
 
@@ -129,7 +123,7 @@ def smooth_gaussian(gray: np.ndarray, ksize: tuple[int, int] = GAUSSIAN_KSIZE) -
 
 
 # ---------------------------------------------------------------------------
-# Pipeline step 4: Canny edge detection
+# Step 4: Canny edge detection
 # ---------------------------------------------------------------------------
 
 
@@ -159,7 +153,7 @@ def extract_edges(
 
 
 # ---------------------------------------------------------------------------
-# Pipeline step 5: Find the largest quadrilateral contour
+# Step 5: Find the largest quadrilateral contour
 # ---------------------------------------------------------------------------
 # This is the key step — and the hardest one.  Strategy:
 #   1. Find all contours from the edge map (RETR_EXTERNAL)
@@ -192,39 +186,30 @@ def find_largest_quadrilateral(edges: np.ndarray) -> np.ndarray | None:
     Returns:
         float32 (4, 2) array of corner coordinates (TL→TR→BR→BL order),
         or None if no quadrilateral found.
-
-    Raises:
-        RuntimeError:  If no valid quadrilateral is found — the caller
-                       should handle this and suggest re-tuning Canny.
     """
-    # 1. Find all external contours
     contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
         print("[find_largest_quadrilateral] No contours found.")
         return None
 
-    # 2-4. Approximate → filter 4-vertex → pick largest area
-    candidates = []
+    candidates: list[tuple[float, np.ndarray]] = []
     for c in contours:
         peri = cv2.arcLength(c, closed=True)
-        epsilon = 0.02 * peri
-        approx = cv2.approxPolyDP(c, epsilon, closed=True)
+        approx = cv2.approxPolyDP(c, 0.02 * peri, closed=True)
         if len(approx) == 4:
             area = cv2.contourArea(approx)
             candidates.append((area, approx.reshape(4, 2).astype(np.float32)))
 
-    if not candidates:
-        print("[find_largest_quadrilateral] No quadrilateral contours found.")
-        return None
-
-    candidates.sort(key=lambda x: x[0], reverse=True)
-    best = candidates[0]
-    print(f"[find_largest_quadrilateral] Found quad with area={best[0]:.0f} px")
-    return best[1]
+    if candidates:
+        best = max(candidates, key=lambda x: x[0])
+        print(f"[find_largest_quadrilateral] Found quad with area={best[0]:.0f} px")
+        return best[1]
+    print("[find_largest_quadrilateral] No quadrilateral contours found.")
+    return None
 
 
 # ---------------------------------------------------------------------------
-# Pipeline step 6: Perspective warp
+# Step 6: Perspective warp
 # ---------------------------------------------------------------------------
 
 
@@ -296,15 +281,15 @@ def build_combo_report(
     """Build a report figure showing each pipeline stage.
 
     Layout (2×3):
-      Row 0: Noisy input | After denoise | Canny edges
-      Row 1: Warped gray | Warped edges  | (optional text summary)
+      Row 0: Original gray | After denoise | Edges + Quadrilateral overlay
+      Row 1: Warped gray   | Warped edges  | Status
 
     If no quadrilateral was found, row 1 shows the failure state
     with a warning annotation instead.
 
     Args:
         original_gray: Source grayscale image.
-        noisy:         After adding salt-pepper noise.
+        noisy:         After adding salt-pepper noise (or copy of original).
         after_median:  After median + Gaussian denoising.
         edges:         Canny edge map pre-warp.
         warped_gray:   Perspective-corrected gray image.
@@ -333,14 +318,14 @@ def build_combo_report(
     # Row 0
     axes[0, 0].imshow(original_gray, cmap="gray", vmin=0, vmax=255)
     axes[0, 1].imshow(cv2.cvtColor(after_median, cv2.COLOR_BGR2RGB))
-    # Build edge+contour overlay: edges as gray background, then draw quad on top
     if edges is not None:
-        edge_rgb = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
-        edge_rgb = cv2.cvtColor(edge_rgb, cv2.COLOR_BGR2RGB)
+        # Build edge+contour overlay: draw in BGR first, then convert to RGB
+        edge_bgr = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
         if corners is not None:
-            cv2.polylines(edge_rgb, [corners.astype(np.int32)], True, (255, 0, 0), 3)
+            cv2.polylines(edge_bgr, [corners.astype(np.int32)], True, (0, 0, 255), 3)   # red
             for pt in corners:
-                cv2.circle(edge_rgb, pt.astype(np.int32), 8, (0, 255, 0), -1)
+                cv2.circle(edge_bgr, pt.astype(np.int32), 8, (0, 255, 0), -1)           # green
+        edge_rgb = cv2.cvtColor(edge_bgr, cv2.COLOR_BGR2RGB)
         axes[0, 2].imshow(edge_rgb)
 
     # Row 1
@@ -375,7 +360,7 @@ def main() -> None:
     """Run the 6-step document correction pipeline end-to-end.
 
     Pipeline:
-      1. Load (or generate) a tilted document image with salt-pepper noise
+      1. Load (or generate) a tilted document image
       2. Median filter → kill impulse noise
       3. Gaussian blur  → further smooth for clean Canny
       4. Canny          → extract binary edge map
@@ -388,7 +373,7 @@ def main() -> None:
     steps_log: list[tuple[str, float]] = []
 
     # ---- Step 0: Load / generate image ----
-    t0 = time.perf_counter()
+    t_load = time.perf_counter()
     img_path = INPUT_IMAGE
     if not img_path.exists():
         print(f"[WARN] {img_path} not found. Generating a synthetic test image.")
@@ -403,28 +388,30 @@ def main() -> None:
             sys.exit(1)
     print(f"[INFO] Loaded image: {img.shape[1]}×{img.shape[0]}")
     original_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    steps_log.append(("Load image", time.perf_counter() - t_load))
 
-    # ---- Inject salt-pepper noise (optional, for synthetic images) ----
+    # ---- Optional: Inject salt-pepper noise ----
     if ADD_NOISE:
+        t_noise = time.perf_counter()
         print(f"[INFO] Adding {NOISE_PROB*100:.0f}% salt-pepper noise ...")
-        noisy = add_salt_pepper_noise(img)
-        steps_log.append(("Add noise", time.perf_counter() - t0))
+        working_img = add_salt_pepper_noise(img)
+        steps_log.append(("Add noise", time.perf_counter() - t_noise))
     else:
-        noisy = img.copy()
+        working_img = img
         print("[INFO] Noise injection skipped (using real image).")
 
     # ---- Step 1: Median filter ----
     t1 = time.perf_counter()
-    after_median = denoise_median(noisy, MEDIAN_KSIZE)
+    after_median = denoise_median(working_img, MEDIAN_KSIZE)
     steps_log.append(("Median filter", time.perf_counter() - t1))
-    print(f"  Median filter: done")
+    print("  Median filter: done")
 
     # ---- Step 2: Gaussian blur (on grayscale) ----
     t2 = time.perf_counter()
     denoised_gray = cv2.cvtColor(after_median, cv2.COLOR_BGR2GRAY)
     blurred_gray = smooth_gaussian(denoised_gray, GAUSSIAN_KSIZE)
     steps_log.append(("Gaussian blur", time.perf_counter() - t2))
-    print(f"  Gaussian blur: done")
+    print("  Gaussian blur: done")
 
     # ---- Step 3: Canny ----
     t3 = time.perf_counter()
@@ -437,8 +424,8 @@ def main() -> None:
     steps_log.append(("Find quad", time.perf_counter() - t4))
 
     # ---- Step 5: Perspective warp ----
-    warped_gray = np.zeros((1, 1), dtype=np.uint8)
-    warped_edges = np.zeros((1, 1), dtype=np.uint8)
+    warped_gray: np.ndarray = np.zeros((1, 1), dtype=np.uint8)
+    warped_edges: np.ndarray = np.zeros((1, 1), dtype=np.uint8)
     if corners is not None:
         t5 = time.perf_counter()
         warped_bgr = warp_document(img, corners, (OUTPUT_W, OUTPUT_H))
@@ -448,18 +435,20 @@ def main() -> None:
         warped_edges = extract_edges(warped_blurred, CANNY_LOW, CANNY_HIGH)
         steps_log.append(("Perspective warp", time.perf_counter() - t5))
     else:
-        print("[ERROR] No quadrilateral detected — skipping warp. Tune Canny thresholds or add morphological close.")
+        print("[ERROR] No quadrilateral detected — skipping warp. "
+              "Try lowering Canny thresholds or adding morphological close.")
         steps_log.append(("Perspective warp (skipped)", 0.0))
 
     # ---- Step 6: Build + save report ----
     fig = build_combo_report(
-        original_gray, noisy, after_median, edges,
+        original_gray, working_img, after_median, edges,
         warped_gray, warped_edges, corners,
     )
     out_dir = RESULTS_DIR
     out_dir.mkdir(exist_ok=True)
     out_path = out_dir / "day_13_pipeline_report.png"
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
     print(f"\n[INFO] Report saved → {out_path}")
 
     # Print terminal summary
