@@ -34,18 +34,18 @@ INPUT_IMAGE = PROJECT_ROOT / "data" / "raw" / "your_document.jpg"
 RESULTS_DIR = PROJECT_ROOT / "experiments" / "results"
 
 # --- Pipeline parameters (tune these on your test image) ---
-MEDIAN_KSIZE = 5          # kernel size for median filter (odd)
-GAUSSIAN_KSIZE = (5, 5)   # kernel size for Gaussian blur (odd, odd)
-CANNY_LOW = 50            # Canny low threshold
-CANNY_HIGH = 150          # Canny high threshold
+MEDIAN_KSIZE = 5  # kernel size for median filter (odd)
+GAUSSIAN_KSIZE = (5, 5)  # kernel size for Gaussian blur (odd, odd)
+CANNY_LOW = 50  # Canny low threshold
+CANNY_HIGH = 150  # Canny high threshold
 
 # --- Output document size (A4-like proportions) ---
 OUTPUT_W = 2100
 OUTPUT_H = 2970
 
 # --- Salt-pepper noise (only relevant when using synthetic test image) ---
-ADD_NOISE = False         # set True to inject noise on synthetic images
-NOISE_PROB = 0.02         # 2% salt-pepper density
+ADD_NOISE = False  # set True to inject noise on synthetic images
+NOISE_PROB = 0.02  # 2% salt-pepper density
 
 
 # ---------------------------------------------------------------------------
@@ -70,8 +70,8 @@ def add_salt_pepper_noise(img: np.ndarray, prob: float = NOISE_PROB) -> np.ndarr
     noisy = img.copy()
     h, w = noisy.shape[:2]
     mask = np.random.random((h, w))
-    noisy[mask < prob / 2] = 255                     # salt: top half of noise band
-    noisy[(mask >= prob / 2) & (mask < prob)] = 0    # pepper: bottom half of noise band
+    noisy[mask < prob / 2] = 255  # salt: top half of noise band
+    noisy[(mask >= prob / 2) & (mask < prob)] = 0  # pepper: bottom half of noise band
     # Pixels outside the noise band are left unchanged
     return noisy
 
@@ -148,7 +148,9 @@ def extract_edges(
     edges = cv2.Canny(blurred, low, high)
     n_edges = cv2.countNonZero(edges)
     total_px = edges.shape[0] * edges.shape[1]
-    print(f"[extract_edges] Canny({low},{high}): {n_edges:,} edge px ({n_edges/total_px*100:.1f}%)")
+    print(
+        f"[extract_edges] Canny({low},{high}): {n_edges:,} edge px ({n_edges / total_px * 100:.1f}%)"
+    )
     return edges
 
 
@@ -252,12 +254,14 @@ def warp_document(
     Returns:
         Warped BGR image (flat document).
     """
-    dst_pts = np.float32([
-        [0, 0],
-        [dst_size[0], 0],
-        [dst_size[0], dst_size[1]],
-        [0, dst_size[1]],
-    ])
+    dst_pts = np.float32(
+        [
+            [0, 0],
+            [dst_size[0], 0],
+            [dst_size[0], dst_size[1]],
+            [0, dst_size[1]],
+        ]
+    )
     M = cv2.getPerspectiveTransform(src_pts, dst_pts)
     return cv2.warpPerspective(img, M, dst_size, borderMode=cv2.BORDER_CONSTANT)
 
@@ -281,8 +285,8 @@ def print_pipeline_summary(
     total = 0.0
     for name, t in steps:
         total += t
-        print(f"  {name:35s} {t*1000:8.2f} ms")
-    print(f"  {'TOTAL':35s} {total*1000:8.2f} ms")
+        print(f"  {name:35s} {t * 1000:8.2f} ms")
+    print(f"  {'TOTAL':35s} {total * 1000:8.2f} ms")
 
     if corners is not None:
         print("\n[INFO] Document corners (TL→TR→BR→BL):")
@@ -343,9 +347,9 @@ def build_combo_report(
         # Build edge+contour overlay: draw in BGR first, then convert to RGB
         edge_bgr = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
         if corners is not None:
-            cv2.polylines(edge_bgr, [corners.astype(np.int32)], True, (0, 0, 255), 3)   # red
+            cv2.polylines(edge_bgr, [corners.astype(np.int32)], True, (0, 0, 255), 3)  # red
             for pt in corners:
-                cv2.circle(edge_bgr, pt.astype(np.int32), 8, (0, 255, 0), -1)           # green
+                cv2.circle(edge_bgr, pt.astype(np.int32), 8, (0, 255, 0), -1)  # green
         edge_rgb = cv2.cvtColor(edge_bgr, cv2.COLOR_BGR2RGB)
         axes[0, 2].imshow(edge_rgb)
 
@@ -354,18 +358,34 @@ def build_combo_report(
         axes[1, 0].imshow(warped_gray, cmap="gray", vmin=0, vmax=255)
         axes[1, 1].imshow(warped_edges, cmap="gray", vmin=0, vmax=255)
         axes[1, 2].text(
-            0.5, 0.5,
+            0.5,
+            0.5,
             f"Quadrilateral found!\n{warped_gray.shape[1]}×{warped_gray.shape[0]}",
-            ha="center", va="center", fontsize=12, transform=axes[1, 2].transAxes,
+            ha="center",
+            va="center",
+            fontsize=12,
+            transform=axes[1, 2].transAxes,
         )
     else:
-        axes[1, 0].text(0.5, 0.5, "No quadrilateral\ndetected", ha="center", va="center",
-                        fontsize=12, color="red", transform=axes[1, 0].transAxes)
+        axes[1, 0].text(
+            0.5,
+            0.5,
+            "No quadrilateral\ndetected",
+            ha="center",
+            va="center",
+            fontsize=12,
+            color="red",
+            transform=axes[1, 0].transAxes,
+        )
         axes[1, 1].axis("off")
         axes[1, 2].text(
-            0.5, 0.5,
+            0.5,
+            0.5,
             "Try:\n- Lower Canny thresholds\n- Larger median kernel\n- Morphological close",
-            ha="center", va="center", fontsize=10, transform=axes[1, 2].transAxes,
+            ha="center",
+            va="center",
+            fontsize=10,
+            transform=axes[1, 2].transAxes,
         )
 
     fig.tight_layout()
@@ -414,7 +434,7 @@ def main() -> None:
     # ---- Optional: Inject salt-pepper noise ----
     if ADD_NOISE:
         t_noise = time.perf_counter()
-        print(f"[INFO] Adding {NOISE_PROB*100:.0f}% salt-pepper noise ...")
+        print(f"[INFO] Adding {NOISE_PROB * 100:.0f}% salt-pepper noise ...")
         working_img = add_salt_pepper_noise(img)
         steps_log.append(("Add noise", time.perf_counter() - t_noise))
     else:
@@ -456,14 +476,21 @@ def main() -> None:
         warped_edges = extract_edges(warped_blurred, CANNY_LOW, CANNY_HIGH)
         steps_log.append(("Perspective warp", time.perf_counter() - t5))
     else:
-        print("[ERROR] No quadrilateral detected — skipping warp. "
-              "Try lowering Canny thresholds or adding morphological close.")
+        print(
+            "[ERROR] No quadrilateral detected — skipping warp. "
+            "Try lowering Canny thresholds or adding morphological close."
+        )
         steps_log.append(("Perspective warp (skipped)", 0.0))
 
     # ---- Step 6: Build + save report ----
     fig = build_combo_report(
-        original_gray, working_img, after_median, edges,
-        warped_gray, warped_edges, corners,
+        original_gray,
+        working_img,
+        after_median,
+        edges,
+        warped_gray,
+        warped_edges,
+        corners,
     )
     out_dir = RESULTS_DIR
     out_dir.mkdir(exist_ok=True)
@@ -501,14 +528,19 @@ def _make_test_document(height: int = 1200, width: int = 1600) -> np.ndarray:
     doc_w, doc_h = 1400, 900
     flat = np.ones((doc_h, doc_w, 3), dtype=np.uint8) * 245
 
-    cv2.putText(flat, "OPENCV LABS — Day 13", (60, 70), cv2.FONT_HERSHEY_SIMPLEX,
-                1.3, (0, 0, 0), 3)
+    cv2.putText(flat, "OPENCV LABS — Day 13", (60, 70), cv2.FONT_HERSHEY_SIMPLEX, 1.3, (0, 0, 0), 3)
     cv2.line(flat, (60, 90), (doc_w - 60, 90), (0, 0, 0), 2)
 
     overlay = flat.copy()
-    cv2.putText(overlay, "CONFIDENTIAL",
-                (doc_w // 2 - 280, doc_h // 2 + 20),
-                cv2.FONT_HERSHEY_SIMPLEX, 2.2, (200, 200, 210), 6)
+    cv2.putText(
+        overlay,
+        "CONFIDENTIAL",
+        (doc_w // 2 - 280, doc_h // 2 + 20),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        2.2,
+        (200, 200, 210),
+        6,
+    )
     flat = cv2.addWeighted(flat, 0.72, overlay, 0.28, 0)
 
     paragraphs = [
@@ -529,8 +561,7 @@ def _make_test_document(height: int = 1200, width: int = 1600) -> np.ndarray:
     y = 140
     for line in paragraphs:
         if line:
-            cv2.putText(flat, line, (60, y), cv2.FONT_HERSHEY_SIMPLEX,
-                        0.55, (50, 50, 50), 1)
+            cv2.putText(flat, line, (60, y), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (50, 50, 50), 1)
             y += 28
         else:
             y += 14

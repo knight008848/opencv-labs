@@ -159,6 +159,7 @@ def create_color_mask(hsv_img: np.ndarray, color_name: str) -> np.ndarray:
 
 # --- HEIC / non-standard format I/O ---
 
+
 def read_heic(path: str | Path) -> np.ndarray | None:
     """Read a HEIC image as an OpenCV BGR array.
 
