@@ -712,3 +712,9 @@ def _make_test_document(height: int = 1200, width: int = 1600) -> np.ndarray:
     cv2.putText(bg, "TL", (280, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
     return bg
+
+
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    main()
