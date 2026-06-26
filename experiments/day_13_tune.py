@@ -12,16 +12,19 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 import time
+from itertools import combinations
 from pathlib import Path
 
 import cv2
 import matplotlib
+
+matplotlib.use("Agg")  # must be before pyplot import (headless)
+
 import matplotlib.pyplot as plt
 import numpy as np
-
-matplotlib.use("Agg")
 
 # ---------------------------------------------------------------------------
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -57,8 +60,6 @@ def _order_pts(pts: np.ndarray) -> np.ndarray:
 
 def _quad_not_degenerate(pts: np.ndarray, min_dist: float = 30.0) -> bool:
     """Check that all 4 corners are sufficiently separated."""
-    from itertools import combinations
-
     for i, j in combinations(range(4), 2):
         if np.linalg.norm(pts[i] - pts[j]) < min_dist:
             return False
@@ -103,7 +104,7 @@ def find_best_quad(
                 pts = approx.reshape(4, 2).astype(np.float32)
                 if _quad_not_degenerate(pts):
                     quads.append((cv2.contourArea(pts), pts))
-                break
+                    break  # use smallest epsilon that yields a valid quad
     if quads:
         best = max(quads, key=lambda x: x[0])
         return _order_pts(best[1]), "approxPolyDP"
@@ -128,8 +129,6 @@ def find_best_quad(
                 area_minrect = cv2.contourArea(quad_minrect)
                 if area_hull > 0 and area_minrect > area_hull * 1.05:
                     # Target midpoint area, convert to linear scale
-                    import math
-
                     target_area = (area_hull + area_minrect) / 2
                     expand = math.sqrt(target_area / area_hull) - 1.0
                     expand = min(expand, 0.15)  # cap at 15%
@@ -176,13 +175,19 @@ def build_report(
     axes[1, 0].imshow(original_gray, cmap="gray")
     if corners is not None:
         corners_i = corners.astype(np.int32)
-        cv2.polylines(original_gray, [corners_i], True, 255, 3)
+        overlay = original_gray.copy()
+        cv2.polylines(overlay, [corners_i], True, 255, 3)
         for i, (x, y) in enumerate(corners_i):
             axes[1, 0].text(x + 5, y - 5, f"P{i}", color="red", fontsize=8)
+        axes[1, 0].imshow(overlay, cmap="gray")
     axes[1, 0].set_title("Detected quadrilateral")
     axes[1, 0].axis("off")
 
-    axes[1, 1].imshow(warped if warped is not None else np.zeros((1, 1)), cmap="gray")
+    if warped is not None:
+        warped_display = cv2.cvtColor(warped, cv2.COLOR_BGR2RGB)
+    else:
+        warped_display = np.zeros((1, 1, 3), dtype=np.uint8)
+    axes[1, 1].imshow(warped_display)
     axes[1, 1].set_title("Warped (corrected)")
     axes[1, 1].axis("off")
 
@@ -256,14 +261,7 @@ def tune_single(img_path: Path) -> dict:
 
         method_tag = f" [{method}]" if method != "approxPolyDP" else ""
 
-        if method == "approxPolyDP":
-            method_rank = 0
-        elif method == "convexHull":
-            method_rank = 1
-        elif method == "minAreaRect":
-            method_rank = 2
-        else:
-            method_rank = 3
+        method_rank = {"approxPolyDP": 0, "convexHull": 1, "minAreaRect": 2}.get(method, 99)
 
         print(
             f"  mk={mk} gk={str(gk):12s} canny=({cl:3d},{ch:3d}) → area={area_pct:5.1f}% {elapsed:5.0f}ms{status}{method_tag}"
@@ -294,10 +292,6 @@ def tune_single(img_path: Path) -> dict:
     # Save report
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    # Draw quad on gray for visualization
-    gray_viz = gray.copy()
-    quad_scaled = (quad * 1).astype(np.int32)  # quad is already in scaled coords
-    cv2.polylines(gray_viz, [quad_scaled], True, 255, 3)
 
     fig = build_report(gray, edges, quad, warped, params_str)
     report_path = RESULTS_DIR / f"tune_{stem}_report.png"
