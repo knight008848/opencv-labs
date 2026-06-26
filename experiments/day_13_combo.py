@@ -14,16 +14,13 @@
 
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-
-# Support HEIC input via pillow-heif (optional dependency)
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
-from utils import any_image_reader  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -46,6 +43,50 @@ OUTPUT_H = 2970
 # --- Salt-pepper noise (only relevant when using synthetic test image) ---
 ADD_NOISE = False  # set True to inject noise on synthetic images
 NOISE_PROB = 0.02  # 2% salt-pepper density
+
+# --- Supported image formats (OpenCV-native only) ---
+SUPPORTED_EXTENSIONS = frozenset(
+    {
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".bmp",
+        ".tiff",
+        ".tif",
+    }
+)
+
+
+# ---------------------------------------------------------------------------
+# Format checking
+# ---------------------------------------------------------------------------
+
+
+def is_supported_image(path: Path, *, verify_content: bool = False) -> bool:
+    """Check whether a file is a supported image format.
+
+    Two-layer check:
+      1. Extension — only accept known suffixes (JPG, PNG, TIFF, HEIC, …).
+      2. Content — optionally try ``cv2.imread`` to confirm OpenCV
+         can actually decode the file.  Use this for batch mode where you
+         want to skip corrupt files rather than crash on them.
+
+    Args:
+        path:           File to check.
+        verify_content: If True, also try to decode the image.
+
+    Returns:
+        True if all enabled checks pass.
+    """
+    if not path.is_file():
+        return False
+    if path.suffix.lower() not in SUPPORTED_EXTENSIONS:
+        return False
+    if verify_content:
+        img = cv2.imread(str(path))
+        if img is None:
+            return False
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -393,41 +434,55 @@ def build_combo_report(
 
 
 # ---------------------------------------------------------------------------
-# Main pipeline
+# Core pipeline (single image)
 # ---------------------------------------------------------------------------
 
 
-def main() -> None:
-    """Run the 6-step document correction pipeline end-to-end.
+def process_single_image(img_path: Path) -> dict:
+    """Run the full 6-step pipeline on a single image.
 
-    Pipeline:
-      1. Load (or generate) a tilted document image
-      2. Median filter → kill impulse noise
-      3. Gaussian blur  → further smooth for clean Canny
-      4. Canny          → extract binary edge map
-      5. findContours + approxPolyDP  → find the largest quadrilateral
-      6. warpPerspective  → flat document correction
-      7. Build + save side-by-side report figure
+    Args:
+        img_path: Path to the input image (JPG, PNG, HEIC, etc.).
+
+    Returns:
+        dict with keys:
+            path      — input path (for batch tracking)
+            success   — True if quadrilateral was found
+            area      — quadrilateral area in px (0 if not found)
+            corners   — (4, 2) array or None
+            warped    — warped BGR image or None
+            steps_log — list of (step_name, elapsed_seconds)
     """
     import time
 
     steps_log: list[tuple[str, float]] = []
 
-    # ---- Step 0: Load / generate image ----
+    # ---- Format & content check ----
+    if not is_supported_image(img_path, verify_content=True):
+        print(f"[ERROR] Unsupported or corrupt image: {img_path}")
+        return {
+            "path": img_path,
+            "success": False,
+            "area": 0,
+            "corners": None,
+            "warped": None,
+            "steps_log": [],
+        }
+
+    # ---- Step 0: Load image ----
     t_load = time.perf_counter()
-    img_path = INPUT_IMAGE
-    if not img_path.exists():
-        print(f"[WARN] {img_path} not found. Generating a synthetic test image.")
-        img = _make_test_document()
-        img_path.parent.mkdir(parents=True, exist_ok=True)
-        cv2.imwrite(str(img_path), img)
-        print(f"[INFO] Saved synthetic image → {img_path}")
-    else:
-        img = any_image_reader(img_path)
-        if img is None:
-            print(f"[ERROR] Could not load {img_path}")
-            sys.exit(1)
-    print(f"[INFO] Loaded image: {img.shape[1]}×{img.shape[0]}")
+    img = cv2.imread(str(img_path))
+    if img is None:
+        print(f"[ERROR] Could not load {img_path}")
+        return {
+            "path": img_path,
+            "success": False,
+            "area": 0,
+            "corners": None,
+            "warped": None,
+            "steps_log": [],
+        }
+    print(f"[INFO] Loaded: {img_path.name}  ({img.shape[1]}×{img.shape[0]})")
     original_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     steps_log.append(("Load image", time.perf_counter() - t_load))
 
@@ -439,20 +494,17 @@ def main() -> None:
         steps_log.append(("Add noise", time.perf_counter() - t_noise))
     else:
         working_img = img
-        print("[INFO] Noise injection skipped (using real image).")
 
     # ---- Step 1: Median filter ----
     t1 = time.perf_counter()
     after_median = denoise_median(working_img, MEDIAN_KSIZE)
     steps_log.append(("Median filter", time.perf_counter() - t1))
-    print("  Median filter: done")
 
     # ---- Step 2: Gaussian blur (on grayscale) ----
     t2 = time.perf_counter()
     denoised_gray = cv2.cvtColor(after_median, cv2.COLOR_BGR2GRAY)
     blurred_gray = smooth_gaussian(denoised_gray, GAUSSIAN_KSIZE)
     steps_log.append(("Gaussian blur", time.perf_counter() - t2))
-    print("  Gaussian blur: done")
 
     # ---- Step 3: Canny ----
     t3 = time.perf_counter()
@@ -465,21 +517,18 @@ def main() -> None:
     steps_log.append(("Find quad", time.perf_counter() - t4))
 
     # ---- Step 5: Perspective warp ----
+    warped_bgr = None
     warped_gray: np.ndarray = np.zeros((1, 1), dtype=np.uint8)
     warped_edges: np.ndarray = np.zeros((1, 1), dtype=np.uint8)
     if corners is not None:
         t5 = time.perf_counter()
         warped_bgr = warp_document(img, corners, (OUTPUT_W, OUTPUT_H))
         warped_gray = cv2.cvtColor(warped_bgr, cv2.COLOR_BGR2GRAY)
-        # Re-run Canny on the warped image for comparison
         warped_blurred = smooth_gaussian(warped_gray, GAUSSIAN_KSIZE)
         warped_edges = extract_edges(warped_blurred, CANNY_LOW, CANNY_HIGH)
         steps_log.append(("Perspective warp", time.perf_counter() - t5))
     else:
-        print(
-            "[ERROR] No quadrilateral detected — skipping warp. "
-            "Try lowering Canny thresholds or adding morphological close."
-        )
+        print("  [ERROR] No quadrilateral detected — skipping warp.")
         steps_log.append(("Perspective warp (skipped)", 0.0))
 
     # ---- Step 6: Build + save report ----
@@ -494,13 +543,97 @@ def main() -> None:
     )
     out_dir = RESULTS_DIR
     out_dir.mkdir(exist_ok=True)
-    out_path = out_dir / "day_13_pipeline_report.png"
+    stem = img_path.stem
+    out_path = out_dir / f"day_13_{stem}_report.png"
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"\n[INFO] Report saved → {out_path}")
+    print(f"[INFO] Report → {out_path}")
 
     # Print terminal summary
     print_pipeline_summary(steps_log, corners)
+
+    # Save standalone warped image if successful
+    if warped_bgr is not None:
+        processed_dir = PROJECT_ROOT / "data" / "processed"
+        processed_dir.mkdir(parents=True, exist_ok=True)
+        warp_path = processed_dir / f"{stem}_corrected.png"
+        cv2.imwrite(str(warp_path), warped_bgr)
+        print(f"[INFO] Warped → {warp_path}")
+
+    quad_area = cv2.contourArea(corners) if corners is not None else 0
+    return {
+        "path": img_path,
+        "success": corners is not None,
+        "area": quad_area,
+        "corners": corners,
+        "warped": warped_bgr,
+        "steps_log": steps_log,
+    }
+
+
+# ---------------------------------------------------------------------------
+# CLI entry point
+# ---------------------------------------------------------------------------
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Day 13 — Document correction pipeline (denoise → edge → "
+        "quadrilateral → perspective warp)",
+    )
+    parser.add_argument(
+        "input",
+        nargs="?",
+        type=Path,
+        default=None,
+        help="Path to an image file or directory.  Default: data/raw/your_document.jpg",
+    )
+    parser.add_argument(
+        "--batch",
+        action="store_true",
+        help="Process all supported images in the given directory",
+    )
+    args = parser.parse_args()
+
+    # Determine which image(s) to process
+    if args.input is None:
+        # No argument → fallback to default single image
+        paths = [INPUT_IMAGE]
+    elif args.input.is_dir() or args.batch:
+        # Directory or --batch flag → scan for images (extension check only,
+        # content verification happens per-file in process_single_image)
+        root = args.input if args.input.is_dir() else PROJECT_ROOT / "data" / "raw"
+        paths = sorted([p for p in root.iterdir() if is_supported_image(p, verify_content=False)])
+        if not paths:
+            print(f"[ERROR] No supported images found in {root}")
+            sys.exit(1)
+        print(f"[INFO] Batch mode: {len(paths)} image(s) in {root}\n")
+    else:
+        # Single file
+        paths = [args.input]
+
+    results: list[dict] = []
+    for i, p in enumerate(paths, 1):
+        if not p.exists():
+            print(f"[SKIP] {p} does not exist")
+            results.append({"path": p, "success": False, "area": 0})
+            continue
+        print(f"\n{'=' * 60}")
+        print(f"[{i}/{len(paths)}] Processing: {p.name}")
+        print(f"{'=' * 60}")
+        r = process_single_image(p)
+        results.append(r)
+
+    # Batch summary
+    if len(results) > 1:
+        ok = sum(1 for r in results if r["success"])
+        print(f"\n{'=' * 60}")
+        print(f"BATCH SUMMARY: {ok}/{len(results)} succeeded")
+        for r in results:
+            status = "✓" if r["success"] else "✗"
+            area = f" ({r['area']:.0f} px)" if r["success"] else ""
+            print(f"  {status} {r['path'].name:35s}{area}")
+        print(f"{'=' * 60}")
 
 
 # ---------------------------------------------------------------------------
@@ -579,9 +712,3 @@ def _make_test_document(height: int = 1200, width: int = 1600) -> np.ndarray:
     cv2.putText(bg, "TL", (280, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
     return bg
-
-
-# ---------------------------------------------------------------------------
-
-if __name__ == "__main__":
-    main()
