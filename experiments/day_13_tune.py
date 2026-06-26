@@ -108,8 +108,37 @@ def find_best_quad(
         best = max(quads, key=lambda x: x[0])
         return _order_pts(best[1]), "approxPolyDP"
 
-    # --- Stage 2: minAreaRect (for partial/damaged documents) ---
+    # --- Stage 2: convex hull + approxPolyDP (fills missing corners) ---
     largest = max(contours, key=cv2.contourArea)
+    hull = cv2.convexHull(largest)
+    peri = cv2.arcLength(hull, True)
+    for eps_factor in [0.04, 0.06, 0.08, 0.10, 0.12]:
+        approx = cv2.approxPolyDP(hull, eps_factor * peri, True)
+        if len(approx) == 4:
+            pts = approx.reshape(4, 2).astype(np.float32)
+            if _quad_not_degenerate(pts):
+                quad_hull = _order_pts(pts)
+
+                # Adaptive expansion: blend toward minAreaRect for large gaps
+                rect = cv2.minAreaRect(largest)
+                box = cv2.boxPoints(rect).astype(np.float32)
+                quad_minrect = _order_pts(box)
+
+                area_hull = cv2.contourArea(quad_hull)
+                area_minrect = cv2.contourArea(quad_minrect)
+                if area_hull > 0 and area_minrect > area_hull * 1.05:
+                    # Target midpoint area, convert to linear scale
+                    import math
+
+                    target_area = (area_hull + area_minrect) / 2
+                    expand = math.sqrt(target_area / area_hull) - 1.0
+                    expand = min(expand, 0.15)  # cap at 15%
+                    center = quad_hull.mean(axis=0)
+                    quad_hull = center + (quad_hull - center) * (1.0 + expand)
+
+                return quad_hull, "convexHull"
+
+    # --- Stage 3: minAreaRect (last resort for heavily damaged docs) ---
     rect = cv2.minAreaRect(largest)
     box = cv2.boxPoints(rect).astype(np.float32)
     if _quad_not_degenerate(box):
@@ -204,7 +233,8 @@ def tune_single(img_path: Path) -> dict:
     print(f"  Resolution: {img_full.shape[1]}×{img_full.shape[0]} → scaled {w}×{h}")
 
     best_area_pct = 0
-    best_result = None  # (quad, warped_full_res, edges, params_str)
+    best_method_rank = 99  # lower = better: 0=approxPolyDP, 1=minAreaRect
+    best_result = None  # (quad, warped_full_res, edges, params_str, method)
 
     for mk, gk, cl, ch in PARAM_GRID:
         t0 = time.perf_counter()
@@ -224,28 +254,41 @@ def tune_single(img_path: Path) -> dict:
         else:
             status = "  ✓"
 
-        method_tag = f" [{method}]" if method == "minAreaRect" else ""
+        method_tag = f" [{method}]" if method != "approxPolyDP" else ""
+
+        if method == "approxPolyDP":
+            method_rank = 0
+        elif method == "convexHull":
+            method_rank = 1
+        elif method == "minAreaRect":
+            method_rank = 2
+        else:
+            method_rank = 3
+
         print(
             f"  mk={mk} gk={str(gk):12s} canny=({cl:3d},{ch:3d}) → area={area_pct:5.1f}% {elapsed:5.0f}ms{status}{method_tag}"
         )
 
-        if area_pct > best_area_pct:
+        # Prefer approxPolyDP over minAreaRect; within same method, prefer larger area
+        better = method_rank < best_method_rank or (
+            method_rank == best_method_rank and area_pct > best_area_pct
+        )
+        if better and area_pct >= 10:
             best_area_pct = area_pct
+            best_method_rank = method_rank
             # Warp at full resolution
             quad_full = quad / scale
             warped = warp_document(img_full, quad_full)
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            _, edges = cv2.threshold(
-                cv2.Canny(cv2.GaussianBlur(gray, gk, 0), cl, ch), 0, 255, cv2.THRESH_BINARY
-            )
+            edges_viz = cv2.Canny(cv2.GaussianBlur(gray, gk, 0), cl, ch)
             params_str = f"median={mk} gauss={gk} canny=({cl},{ch}) morph_close=5 method={method}"
-            best_result = (quad, warped, edges, params_str, area_pct)
+            best_result = (quad, warped, edges_viz, params_str, area_pct, method)
 
     if best_result is None:
         print("  ✗ No quadrilateral found in any parameter combination!")
         return {"path": img_path, "success": False, "area_pct": 0}
 
-    quad, warped, edges, params_str, area_pct = best_result
+    quad, warped, edges, params_str, area_pct, method = best_result
     print(f"\n  ★ Best: {params_str}  area={area_pct:.1f}%")
 
     # Save report
