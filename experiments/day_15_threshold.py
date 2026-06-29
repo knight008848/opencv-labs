@@ -31,8 +31,7 @@ def make_test_images(output_dir: Path) -> list[dict]:
     paper = np.full((h, w), 255, dtype=np.uint8)
     for y_ratio, line in lines:
         y = int(h * y_ratio)
-        cv2.putText(paper, line, (40, y), cv2.FONT_HERSHEY_SIMPLEX,
-                    0.9, 0, 2)  # color=0 (black)
+        cv2.putText(paper, line, (40, y), cv2.FONT_HERSHEY_SIMPLEX, 0.9, 0, 2)  # color=0 (black)
     uniform = paper.copy()
 
     # --- side_light: right side shadowed, paper darkens ---
@@ -47,8 +46,8 @@ def make_test_images(output_dir: Path) -> list[dict]:
     very_dark = dark.copy()
 
     images = [
-        {"name": "uniform",   "gray": uniform},
-        {"name": "side_light","gray": side_light},
+        {"name": "uniform", "gray": uniform},
+        {"name": "side_light", "gray": side_light},
         {"name": "very_dark", "gray": very_dark},
     ]
 
@@ -68,22 +67,27 @@ def apply_thresholds(gray: np.ndarray) -> dict[str, np.ndarray]:
          "global": ..., "otsu": ..., "adaptive": ...,
          "global_inv": ..., "otsu_inv": ..., "adaptive_inv": ...}
     """
-    _, global_t  = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
-    _, otsu      = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    adaptive     = cv2.adaptiveThreshold(
-        gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv2.THRESH_BINARY, 31, 10)
+    _, global_t = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
+    _, otsu = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    adaptive = cv2.adaptiveThreshold(
+        gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 10
+    )
 
     _, global_inv = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY_INV)
-    _, otsu_inv   = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-    adaptive_inv  = cv2.adaptiveThreshold(
-        gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv2.THRESH_BINARY_INV, 31, 10)
+    _, otsu_inv = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    adaptive_inv = cv2.adaptiveThreshold(
+        gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 31, 10
+    )
 
-    return {"gray": gray,
-            "global": global_t, "otsu": otsu, "adaptive": adaptive,
-            "global_inv": global_inv, "otsu_inv": otsu_inv,
-            "adaptive_inv": adaptive_inv}
+    return {
+        "gray": gray,
+        "global": global_t,
+        "otsu": otsu,
+        "adaptive": adaptive,
+        "global_inv": global_inv,
+        "otsu_inv": otsu_inv,
+        "adaptive_inv": adaptive_inv,
+    }
 
 
 def white_pixel_ratio(binary: np.ndarray) -> float:
@@ -92,8 +96,7 @@ def white_pixel_ratio(binary: np.ndarray) -> float:
     return cv2.countNonZero(binary) / binary.size
 
 
-def build_comparison_panel(results: dict[str, np.ndarray],
-                           title: str) -> np.ndarray:
+def build_comparison_panel(results: dict[str, np.ndarray], title: str) -> np.ndarray:
     """
     Create a 4×2 grid comparing BINARY (left) vs BINARY_INV (right).
 
@@ -118,43 +121,45 @@ def build_comparison_panel(results: dict[str, np.ndarray],
 
     # Rows 1-3: BINARY (left) vs BINARY_INV (right)
     pairs = [
-        (1, "global",      "global_inv"),
-        (2, "otsu",        "otsu_inv"),
-        (3, "adaptive",    "adaptive_inv"),
+        (1, "global", "global_inv"),
+        (2, "otsu", "otsu_inv"),
+        (3, "adaptive", "adaptive_inv"),
     ]
     for row, key_bin, key_inv in pairs:
         y0 = row * (h + gap)
-        panel[y0:y0+h, :w]        = results[key_bin]
-        panel[y0:y0+h, w+gap:]    = results[key_inv]
+        panel[y0 : y0 + h, :w] = results[key_bin]
+        panel[y0 : y0 + h, w + gap :] = results[key_inv]
 
     # Annotate row labels
     labels = [
-        (5, 20,                 f"Original ({title})"),
-        (5,   h+gap+20,         "BINARY global"),
-        (w+gap+5, h+gap+20,     "BINARY_INV global"),
-        (5,  2*(h+gap)+20,      "BINARY otsu"),
-        (w+gap+5, 2*(h+gap)+20, "BINARY_INV otsu"),
-        (5,  3*(h+gap)+20,      "BINARY adaptive"),
-        (w+gap+5, 3*(h+gap)+20, "BINARY_INV adaptive"),
+        (5, 20, f"Original ({title})"),
+        (5, h + gap + 20, "BINARY global"),
+        (w + gap + 5, h + gap + 20, "BINARY_INV global"),
+        (5, 2 * (h + gap) + 20, "BINARY otsu"),
+        (w + gap + 5, 2 * (h + gap) + 20, "BINARY_INV otsu"),
+        (5, 3 * (h + gap) + 20, "BINARY adaptive"),
+        (w + gap + 5, 3 * (h + gap) + 20, "BINARY_INV adaptive"),
     ]
     for x, y, label in labels:
-        cv2.putText(panel, label, (x, y),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, 160, 1)  # gray visible on both black & white
+        cv2.putText(
+            panel, label, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.55, 160, 1
+        )  # gray visible on both black & white
 
     # Ratio annotations for all 6 binary results
     ratio_positions = [
-        (w+gap+5, h+gap+40,        "global_inv"),
-        (5,       h+gap+40,        "global"),
-        (w+gap+5, 2*(h+gap)+40,    "otsu_inv"),
-        (5,       2*(h+gap)+40,    "otsu"),
-        (w+gap+5, 3*(h+gap)+40,    "adaptive_inv"),
-        (5,       3*(h+gap)+40,    "adaptive"),
+        (w + gap + 5, h + gap + 40, "global_inv"),
+        (5, h + gap + 40, "global"),
+        (w + gap + 5, 2 * (h + gap) + 40, "otsu_inv"),
+        (5, 2 * (h + gap) + 40, "otsu"),
+        (w + gap + 5, 3 * (h + gap) + 40, "adaptive_inv"),
+        (5, 3 * (h + gap) + 40, "adaptive"),
     ]
     for x, y, key in ratio_positions:
         mask = results[key]
         ratio = cv2.countNonZero(mask) / mask.size
-        cv2.putText(panel, f"white {ratio:.1%}", (x, y),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, 160, 1)  # gray visible on both black & white
+        cv2.putText(
+            panel, f"white {ratio:.1%}", (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, 160, 1
+        )  # gray visible on both black & white
 
     panel_bgr = cv2.cvtColor(panel, cv2.COLOR_GRAY2BGR)
     return panel_bgr
@@ -225,17 +230,19 @@ def write_report(results: list[dict], output_dir: Path) -> str:
             lines.append(f"| {method:13} | {r[method]:6.1%}          |")
         lines.append("")
 
-    lines.extend([
-        "## Summary",
-        "",
-        "| Condition   | Recommended | Mode        | Why |",
-        "|-------------|-------------|-------------|-----|",
-        "| Uniform     | global/T=127 | BINARY      | White paper (255) > 127, black ink (0) ≤ 127. Clean split with zero computation. |",
-        "| Side light  | global/T=127 | BINARY_INV  | Same split quality, but INV inverts to white-text-on-black — optimal for contour analysis. |",
-        "| Very dark   | Otsu         | BINARY      | Only Otsu finds the valley in the compressed histogram. Fixed thresholds (127) produce all-black or all-white. |",
-        "",
-        f"*Images saved to `{output_dir}/`*",
-    ])
+    lines.extend(
+        [
+            "## Summary",
+            "",
+            "| Condition   | Recommended | Mode        | Why |",
+            "|-------------|-------------|-------------|-----|",
+            "| Uniform     | global/T=127 | BINARY      | White paper (255) > 127, black ink (0) ≤ 127. Clean split with zero computation. |",
+            "| Side light  | global/T=127 | BINARY_INV  | Same split quality, but INV inverts to white-text-on-black — optimal for contour analysis. |",
+            "| Very dark   | Otsu         | BINARY      | Only Otsu finds the valley in the compressed histogram. Fixed thresholds (127) produce all-black or all-white. |",
+            "",
+            f"*Images saved to `{output_dir}/`*",
+        ]
+    )
 
     report = "\n".join(lines)
     return report
@@ -259,9 +266,7 @@ def main():
         panels.append(panel)
 
         ratios = {
-            name: white_pixel_ratio(mask)
-            for name, mask in thresh_results.items()
-            if name != "gray"
+            name: white_pixel_ratio(mask) for name, mask in thresh_results.items() if name != "gray"
         }
         report_data.append({"name": item["name"], "ratios": ratios})
 
