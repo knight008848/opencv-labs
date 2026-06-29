@@ -7,10 +7,10 @@ Runtime: ~10 min total
 """
 
 import sys
+from pathlib import Path
 
 import cv2
 import numpy as np
-from pathlib import Path
 
 OUT = Path("../data/processed/day_15")
 OUT.mkdir(parents=True, exist_ok=True)
@@ -61,7 +61,7 @@ def drill_threshold_comparison():
     path = str(OUT / "drill1_threshold.png")
     cv2.imwrite(path, panel)
     print(f"  Saved {path}")
-    print(f"  White pixel ratios:")
+    print("  White pixel ratios:")
     print(f"    global:   {cv2.countNonZero(global_t) / global_t.size:.1%}")
     print(f"    otsu:     {cv2.countNonZero(otsu) / otsu.size:.1%}")
     print(f"    adaptive: {cv2.countNonZero(adaptive) / adaptive.size:.1%}")
@@ -96,7 +96,7 @@ def drill_erode_dilate():
     path = str(OUT / "drill2_erode_dilate.png")
     cv2.imwrite(path, h_panel)
     print(f"  Saved {path}")
-    print(f"  White pixel counts:")
+    print("  White pixel counts:")
     print(f"    original:  {cv2.countNonZero(img)}")
     print(f"    eroded:    {cv2.countNonZero(eroded)}  (noise gone, rects shrunk)")
     print(f"    dilate↑:   {cv2.countNonZero(opened)}  (rects recovered, noise stays gone)")
@@ -160,7 +160,7 @@ def drill_open_close():
     right_opened   = cv2.countNonZero(opened[:, 300:])
     noise_removed = right_opened < right_original
 
-    print(f"  Observations:")
+    print("  Observations:")
     print(f"    Left  (Closing): gap filled?     {gap_fixed}  "
           f"(white px {left_original} -> {left_closed})")
     print(f"    Right (Opening): noise removed?  {noise_removed}  "

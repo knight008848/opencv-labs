@@ -5,9 +5,10 @@ Goal: Compare global, Otsu, and adaptive thresholding across 3 lighting conditio
 Runtime: ~60 min
 """
 
+from pathlib import Path
+
 import cv2
 import numpy as np
-from pathlib import Path
 
 
 def make_test_images(output_dir: Path) -> list[dict]:
