@@ -12,18 +12,12 @@ from pathlib import Path
 
 def make_test_images(output_dir: Path) -> list[dict]:
     """
-    Generate 3 synthetic test images simulating different lighting conditions:
-      - uniform: even lighting, clean histogram
-      - side_light: brightness gradient from left to right
-      - very_dark: low overall brightness
-
-    Returns a list of dicts: [{"name": str, "gray": np.ndarray}, ...]
+    Generate 3 synthetic test images simulating different lighting conditions.
+    All use realistic white-paper + black-ink appearance.
     """
+    np.random.seed(2026)
     h, w = 400, 700
 
-    # --- Base document: dark text on light gray background ---
-    bg = np.full((h, w), 180, dtype=np.uint8)
-    text = np.zeros((h, w), dtype=np.uint8)
     lines = [
         (0.20, "OpenCV 30-Day Challenge"),
         (0.32, "Module 7: Thresholding"),
@@ -31,25 +25,25 @@ def make_test_images(output_dir: Path) -> list[dict]:
         (0.56, "Each method has its niche."),
         (0.68, "Know when to use which."),
     ]
+
+    # --- uniform: white paper (255), black ink (0) ---
+    paper = np.full((h, w), 255, dtype=np.uint8)
     for y_ratio, line in lines:
         y = int(h * y_ratio)
-        cv2.putText(text, line, (40, y), cv2.FONT_HERSHEY_SIMPLEX,
-                    0.9, 255, 2)
+        cv2.putText(paper, line, (40, y), cv2.FONT_HERSHEY_SIMPLEX,
+                    0.9, 0, 2)  # color=0 (black)
+    uniform = paper.copy()
 
-    # --- uniform: clean, even lighting ---
-    uniform = np.maximum(bg, text).astype(np.uint8)
+    # --- side_light: right side shadowed, paper darkens ---
+    # gradient: 255 (left) → 150 (right), text stays 0
+    grad = np.linspace(255, 150, w, dtype=np.uint8)
+    side = np.minimum(paper.copy(), grad[None, :])
+    side_light = side.copy()
 
-    # --- side_light: brightness gradient left->right ---
-    # left stays at bg(180), right brightens up to +80
-    grad = np.linspace(0, 80, w, dtype=np.uint8)
-    side = bg.astype(np.int16) + grad[None, :]  # broadcast over rows
-    side = np.clip(side, 0, 255).astype(np.uint8)
-    side_light = np.maximum(side, text).astype(np.uint8)
-
-    # --- very_dark: multiply whole image by 0.3 ---
-    dark = (bg.astype(np.float32) * 0.3).astype(np.uint8)
-    text_dark = (text.astype(np.float32) * 0.9).astype(np.uint8)  # dim text too
-    very_dark = np.maximum(dark, text_dark).astype(np.uint8)
+    # --- very_dark: overall dim, paper→gray, text→near-black ---
+    # Multiply everything by 0.35. Paper 255→89, text 0→0.
+    dark = (uniform.astype(np.float32) * 0.35).astype(np.uint8)
+    very_dark = dark.copy()
 
     images = [
         {"name": "uniform",   "gray": uniform},
@@ -57,7 +51,6 @@ def make_test_images(output_dir: Path) -> list[dict]:
         {"name": "very_dark", "gray": very_dark},
     ]
 
-    # Save originals for reference
     for item in images:
         path = output_dir / f"{item['name']}_original.png"
         cv2.imwrite(str(path), item["gray"])
@@ -67,22 +60,29 @@ def make_test_images(output_dir: Path) -> list[dict]:
 
 def apply_thresholds(gray: np.ndarray) -> dict[str, np.ndarray]:
     """
-    Apply 3 thresholding methods + return the original gray.
+    Apply 3 thresholding methods × 2 modes (BINARY + BINARY_INV).
 
     Returns:
-        {"gray": gray, "global": ..., "otsu": ..., "adaptive": ...}
+        {"gray": gray,
+         "global": ..., "otsu": ..., "adaptive": ...,
+         "global_inv": ..., "otsu_inv": ..., "adaptive_inv": ...}
     """
-    # TODO:
-    #   1. global: cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
-    #   2. otsu:   cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    #   3. adaptive: cv2.adaptiveThreshold(gray, 255, ...)
-    #   Return a dict keyed by method name.
-    _, global_t = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
-    _, otsu     = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    adaptive    = cv2.adaptiveThreshold(
+    _, global_t  = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
+    _, otsu      = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    adaptive     = cv2.adaptiveThreshold(
         gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
         cv2.THRESH_BINARY, 31, 10)
-    return {"gray": gray, "global": global_t, "otsu": otsu, "adaptive": adaptive}
+
+    _, global_inv = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY_INV)
+    _, otsu_inv   = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    adaptive_inv  = cv2.adaptiveThreshold(
+        gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY_INV, 31, 10)
+
+    return {"gray": gray,
+            "global": global_t, "otsu": otsu, "adaptive": adaptive,
+            "global_inv": global_inv, "otsu_inv": otsu_inv,
+            "adaptive_inv": adaptive_inv}
 
 
 def white_pixel_ratio(binary: np.ndarray) -> float:
@@ -93,82 +93,103 @@ def white_pixel_ratio(binary: np.ndarray) -> float:
 
 def build_comparison_panel(results: dict[str, np.ndarray],
                            title: str) -> np.ndarray:
-    """Create a 2x2 annotated comparison grid, returned as BGR for imwrite."""
+    """
+    Create a 4×2 grid comparing BINARY (left) vs BINARY_INV (right).
+
+    Layout:
+      Row 0: Original gray (spans both columns)
+      Row 1: BINARY global   | BINARY_INV global
+      Row 2: BINARY otsu     | BINARY_INV otsu
+      Row 3: BINARY adaptive | BINARY_INV adaptive
+    Each binary cell annotated with white-pixel ratio.
+    """
     gray = results["gray"]
     h, w = gray.shape
     gap = 10
+    rows, cols = 4, 2
 
-    panel = np.zeros((h * 2 + gap, w * 2 + gap), dtype=np.uint8)
+    panel_h = h * rows + (rows - 1) * gap
+    panel_w = w * cols + (cols - 1) * gap
+    panel = np.zeros((panel_h, panel_w), dtype=np.uint8)
 
-    # 2x2 grid:  original      | global
-    #             otsu          | adaptive
-    panel[:h, :w]            = gray
-    panel[:h, w + gap:]      = results["global"]
-    panel[h + gap:, :w]      = results["otsu"]
-    panel[h + gap:, w + gap:] = results["adaptive"]
+    # Row 0: original gray spanning both columns
+    panel[:h, :w] = gray
 
-    # Label each quadrant
+    # Rows 1-3: BINARY (left) vs BINARY_INV (right)
+    pairs = [
+        (1, "global",      "global_inv"),
+        (2, "otsu",        "otsu_inv"),
+        (3, "adaptive",    "adaptive_inv"),
+    ]
+    for row, key_bin, key_inv in pairs:
+        y0 = row * (h + gap)
+        panel[y0:y0+h, :w]        = results[key_bin]
+        panel[y0:y0+h, w+gap:]    = results[key_inv]
+
+    # Annotate row labels
     labels = [
-        (10, 25,            "Original"),
-        (w + gap + 10, 25,  "Global (127)"),
-        (10, h + gap + 25,  "Otsu"),
-        (w + gap + 10, h + gap + 25, "Adaptive"),
+        (5, 20,                 f"Original ({title})"),
+        (5,   h+gap+20,         "BINARY global"),
+        (w+gap+5, h+gap+20,     "BINARY_INV global"),
+        (5,  2*(h+gap)+20,      "BINARY otsu"),
+        (w+gap+5, 2*(h+gap)+20, "BINARY_INV otsu"),
+        (5,  3*(h+gap)+20,      "BINARY adaptive"),
+        (w+gap+5, 3*(h+gap)+20, "BINARY_INV adaptive"),
     ]
     for x, y, label in labels:
         cv2.putText(panel, label, (x, y),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.65, 255, 1)
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, 160, 1)  # gray visible on both black & white
 
-    # Annotate binary quads with white-pixel ratio
-    ratio_annotations = [
-        (w + gap + 10, 55,            results["global"]),
-        (10, h + gap + 55,            results["otsu"]),
-        (w + gap + 10, h + gap + 55,  results["adaptive"]),
+    # Ratio annotations for all 6 binary results
+    ratio_positions = [
+        (w+gap+5, h+gap+40,        "global_inv"),
+        (5,       h+gap+40,        "global"),
+        (w+gap+5, 2*(h+gap)+40,    "otsu_inv"),
+        (5,       2*(h+gap)+40,    "otsu"),
+        (w+gap+5, 3*(h+gap)+40,    "adaptive_inv"),
+        (5,       3*(h+gap)+40,    "adaptive"),
     ]
-    for x, y, mask in ratio_annotations:
+    for x, y, key in ratio_positions:
+        mask = results[key]
         ratio = cv2.countNonZero(mask) / mask.size
         cv2.putText(panel, f"white {ratio:.1%}", (x, y),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, 255, 1)
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, 160, 1)  # gray visible on both black & white
 
-    # Convert to BGR and add title bar
     panel_bgr = cv2.cvtColor(panel, cv2.COLOR_GRAY2BGR)
-    cv2.putText(panel_bgr, f"Lighting: {title}", (10, panel_bgr.shape[0] - 8),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1)
-
     return panel_bgr
 
 
 def write_report(results: list[dict], output_dir: Path) -> str:
-    """Generate a markdown report recommending the best method per lighting type."""
+    """Generate a markdown report with BINARY vs BINARY_INV comparison."""
     lines = [
-        "# Day 15 — Thresholding Comparison Report",
+        "# Day 15 — Thresholding Comparison Report (White Paper + Black Ink)",
         "",
-        "| Lighting   | Global (127) | Otsu     | Adaptive | Winner      |",
-        "|------------|-------------|----------|----------|-------------|",
+        "| Lighting   | BIN-global | BIN-otsu | BIN-adapt | INV-global | INV-otsu | INV-adapt | Winner  |",
+        "|------------|-----------|----------|-----------|------------|----------|-----------|---------|",
     ]
 
     analysis = {
         "uniform": [
-            "- Global (127) fails here: background gray (180) is already above 127, so everything turns white.",
-            "- **Otsu wins**: it finds the valley between text (255) and background (180) automatically.",
-            "- Adaptive also works but produces more white artifacts than necessary.",
-            "- Lesson: when text is brighter than background, global threshold needs careful tuning.",
+            "- White paper (255), black ink (0), even lighting.",
+            "- BINARY with T=127 works: paper > 127 → white, text ≤ 127 → black.",
+            "- BINARY_INV inverts the polarity: text becomes white, background becomes black.",
+            "- Lesson: BINARY is natural for white-paper/black-ink; BINARY_INV is useful if you want white text for contour analysis.",
         ],
         "side_light": [
-            "- Global fails completely (100% white) — the gradient spans both sides of 127.",
-            "- Adaptive also over-thresholds (94% white) because the bright side has zero text/background contrast.",
-            "- **Otsu** is the least broken: it splits the gradient at its midpoint, preserving text on the dim side.",
-            "- Lesson: no method can rescue text that has zero contrast against its local background.",
+            "- White paper has a shadow gradient (255→150 right side), text stays black (0).",
+            "- BINARY with T=127 still works because paper is always ≥150 > 127.",
+            "- BINARY_INV inverts: text becomes white on a black background — cleaner for findContours.",
+            "- Lesson: side-lighting is harmless here because paper is always brighter than ink.",
         ],
         "very_dark": [
-            "- Both Global (127) and Otsu produce the same result (4.2% white): clean text extraction.",
-            "- Adaptive over-thresholds (86% white) — the 31×31 window is too large for this dim, low-contrast scene.",
-            "- **Global (127)** wins by tie-break: simpler and faster, same output quality as Otsu here.",
-            "- Lesson: when the histogram lacks a clear bimodal shape, Otsu offers no advantage over a fixed threshold.",
+            "- Overall dim: paper ≈ 89, text = 0. Paper falls below T=127.",
+            "- BINARY global (127) fails: all pixels ≤ 127 → all black (no information).",
+            "- **Otsu** rescues it: finds the valley between peaks at 0 and 89, correctly splits paper from ink.",
+            "- BINARY_INV global (127) also fails: all pixels ≤ 127 → all white (no information).",
+            "- Lesson: when lighting is low, fixed thresholds fail — Otsu or adaptive are necessary.",
         ],
     }
 
-    # Winner: a good result has white ratio in [1%, 30%] — not all-black, not all-white.
-    # Among those, pick the one with the most moderate ratio.
     for item in results:
         name = item["name"]
         r = item["ratios"]
@@ -176,21 +197,19 @@ def write_report(results: list[dict], output_dir: Path) -> str:
         def score(ratio):
             """0 = extreme (all-black or all-white), higher = more plausible."""
             if ratio <= 0.001 or ratio >= 0.999:
-                return -1  # disqualified
-            return 1.0 - abs(ratio - 0.10)  # expect ~5-15% text coverage
+                return -1
+            return 1.0 - abs(ratio - 0.10)
 
         valid = {m: s for m, rt in r.items() if (s := score(rt)) >= 0}
         winner = max(valid, key=valid.get) if valid else "???"
 
         lines.append(
-            f"| {name:11} | {r['global']:7.1%}    | {r['otsu']:6.1%}   | {r['adaptive']:6.1%}   | **{winner}** |"
+            f"| {name:11} | {r['global']:9.1%} | {r['otsu']:7.1%} | {r['adaptive']:8.1%} |"
+            f" {r['global_inv']:8.1%} | {r['otsu_inv']:6.1%} | {r['adaptive_inv']:7.1%} |"
+            f" **{winner}** |"
         )
 
-    lines.extend([
-        "",
-        "## Per-condition analysis",
-        "",
-    ])
+    lines.extend(["", "## Per-condition analysis", ""])
 
     for item in results:
         name = item["name"]
@@ -199,20 +218,20 @@ def write_report(results: list[dict], output_dir: Path) -> str:
         lines.append("")
         lines.extend(analysis.get(name, ["- No analysis available."]))
         lines.append("")
-        lines.append("| Method   | White pixel ratio |")
-        lines.append("|----------|-------------------|")
-        for method in ["global", "otsu", "adaptive"]:
-            lines.append(f"| {method:8} | {r[method]:6.1%}          |")
+        lines.append("| Method        | White pixel ratio |")
+        lines.append("|---------------|-------------------|")
+        for method in ["global", "otsu", "adaptive", "global_inv", "otsu_inv", "adaptive_inv"]:
+            lines.append(f"| {method:13} | {r[method]:6.1%}          |")
         lines.append("")
 
     lines.extend([
         "## Summary",
         "",
-        "| Condition   | Recommended Method | Why |",
-        "|-------------|-------------------|-----|",
-        "| Uniform     | Otsu              | Global fails when bg gray (180) already sits above 127. Otsu finds the true text/bg divide. |",
-        "| Side light  | Otsu              | All methods struggle; Otsu is the least broken — it splits the gradient at its midpoint. |",
-        "| Very dark   | Global (127)      | Same output as Otsu (4.2% white), but simpler and faster. Dim histogram has no clear bimodal peak. |",
+        "| Condition   | Recommended | Mode        | Why |",
+        "|-------------|-------------|-------------|-----|",
+        "| Uniform     | global/T=127 | BINARY      | White paper (255) > 127, black ink (0) ≤ 127. Clean split with zero computation. |",
+        "| Side light  | global/T=127 | BINARY_INV  | Same split quality, but INV inverts to white-text-on-black — optimal for contour analysis. |",
+        "| Very dark   | Otsu         | BINARY      | Only Otsu finds the valley in the compressed histogram. Fixed thresholds (127) produce all-black or all-white. |",
         "",
         f"*Images saved to `{output_dir}/`*",
     ])
@@ -256,7 +275,7 @@ def main():
     report_path = output_dir / "report.md"
     report_path.write_text(report, encoding="utf-8")
     print(f"  Saved {report_path}")
-    print("Done. Activate conda and run: python experiments/day_15_threshold.py")
+    print("Done. View results in data/processed/day_15/")
 
 
 if __name__ == "__main__":
