@@ -85,7 +85,9 @@ def binarize_from_color(image_path: Path) -> np.ndarray:
 
     This is useful if you want to test on real data.
     """
-    img = cv2.imread(image_path)
+    img = cv2.imread(str(image_path))
+    if img is None:
+        raise FileNotFoundError(f"Image not found or unreadable: {image_path}")
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     ret, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
     return binary
@@ -235,22 +237,73 @@ def analyze_element_shapes() -> str:
       - What kind of object it preserves best
       - When it causes unwanted artifacts
 
-    HINT:
-      - RECT: preserves sharp corners, good for QR codes / documents
-      - ELLIPSE: rounder boundaries, good for cells / coins / organic shapes
-      - CROSS: strong directional bias, good for line detection in specific
-        orientations
-
     Returns:
         Multi-line string for terminal output.
     """
-    text_analysis = """
-    RECT: preserves sharp corners, good for QR codes / documents
-    ELLIPSE: rounder boundaries, good for cells / coins / organic shapes
-    CROSS: strong directional bias, good for line detection in specific
-        orientations
-    """
-    return text_analysis
+    import numpy as np
+    import cv2
+
+    lines = []
+    lines.append("=" * 60)
+    lines.append("Structuring Element Shape Analysis")
+    lines.append("=" * 60)
+    lines.append("")
+
+    for name, morph_const in [
+        ("RECT", cv2.MORPH_RECT),
+        ("ELLIPSE", cv2.MORPH_ELLIPSE),
+        ("CROSS", cv2.MORPH_CROSS),
+    ]:
+        k = cv2.getStructuringElement(morph_const, (7, 7))
+        # Render the kernel as ASCII art
+        ascii_rows = []
+        for row in k:
+            ascii_rows.append("  " + " ".join("█" if v else "·" for v in row.flatten()))
+        kernel_str = "\n".join(ascii_rows)
+
+        lines.append(f"── {name} (7×7) ──")
+        lines.append(kernel_str)
+        lines.append("")
+
+    lines.append("─" * 60)
+    lines.append("Shape-by-shape guidance")
+    lines.append("─" * 60)
+    lines.append("")
+    lines.append(
+        "RECT  — all 4 directions weighted equally.\n"
+        "  Best for: QR codes, document text, PCB inspection —\n"
+        "            anything with sharp 90° corners.\n"
+        "  Artifact: rounds NOTHING — it preserves corners so\n"
+        "            aggressively that a circle becomes an octagon\n"
+        "            after a few iterations."
+    )
+    lines.append("")
+    lines.append(
+        "ELLIPSE — approximates a circle (isotropic).\n"
+        "  Best for: cells, coins, pellets, organic shapes.\n"
+        "  Artifact: smooths sharp corners — if you erode a\n"
+        "            rectangle with ELLIPSE 7×7, its corners\n"
+        "            get visibly rounded."
+    )
+    lines.append("")
+    lines.append(
+        "CROSS  — only the center row and column are active.\n"
+        "  Best for: preserving / detecting thin lines that\n"
+        "            are exactly horizontal or vertical.\n"
+        "  Artifact: diagonal features (45°, 135°) are\n"
+        "            obliterated — a diagonal scratch that\n"
+        "            survives RECT erosion may disappear under\n"
+        "            CROSS erosion."
+    )
+    lines.append("")
+    lines.append(
+        "Compare morph_grid_k{3,5,7}.png — the gradient\n"
+        "column is the most sensitive: RECT produces blocky\n"
+        "edges, ELLIPSE gives smooth contours, and CROSS\n"
+        "picks up horizontal & vertical edges but misses\n"
+        "diagonal ones."
+    )
+    return "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------
