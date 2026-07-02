@@ -5,18 +5,16 @@ Goal: 6-in-1 morph operation comparison across 3 structuring element shapes.
 Runtime: ~45 min
 """
 
-import sys
-import time
 from pathlib import Path
 
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 
-
 # ---------------------------------------------------------------------------
 # Step 1 — Create a noisy binary test image
 # ---------------------------------------------------------------------------
+
 
 def create_test_image(size: tuple[int, int] = (1200, 1600)) -> np.ndarray:
     """
@@ -41,9 +39,9 @@ def create_test_image(size: tuple[int, int] = (1200, 1600)) -> np.ndarray:
     bg = np.zeros((height, width), dtype=np.uint8)
 
     # --- Large filled shapes ---
-    cv2.rectangle(bg, (0, 0), (width, 200), 255, -1)                     # top bar
-    cv2.rectangle(bg, (100, 400), (400, 700), 255, -1)                    # left rectangle
-    cv2.rectangle(bg, (width - 400, 500), (width - 100, 900), 255, -1)    # right rectangle
+    cv2.rectangle(bg, (0, 0), (width, 200), 255, -1)  # top bar
+    cv2.rectangle(bg, (100, 400), (400, 700), 255, -1)  # left rectangle
+    cv2.rectangle(bg, (width - 400, 500), (width - 100, 900), 255, -1)  # right rectangle
 
     cv2.circle(bg, (width // 2, height // 2), int(height // 4), 255, -1)  # center circle
 
@@ -51,8 +49,8 @@ def create_test_image(size: tuple[int, int] = (1200, 1600)) -> np.ndarray:
     # Placed at x=450, well left of the circle (left edge at x=500).
     # Two small gaps let closing try to reconnect the broken line.
     vx = 450
-    cv2.line(bg, (vx, 0), (vx, 224), 255, 2)       # top segment
-    cv2.line(bg, (vx, 232), (vx, 794), 255, 2)      # middle segment
+    cv2.line(bg, (vx, 0), (vx, 224), 255, 2)  # top segment
+    cv2.line(bg, (vx, 232), (vx, 794), 255, 2)  # middle segment
     cv2.line(bg, (vx, 802), (vx, height - 1), 255, 2)  # bottom segment
 
     # --- Broken horizontal line — for closing test ---
@@ -75,7 +73,6 @@ def create_test_image(size: tuple[int, int] = (1200, 1600)) -> np.ndarray:
     return bg
 
 
-
 def binarize_from_color(image_path: Path) -> np.ndarray:
     """
     Alternative: load a real color image and convert to binary.
@@ -96,6 +93,7 @@ def binarize_from_color(image_path: Path) -> np.ndarray:
 # ---------------------------------------------------------------------------
 # Step 2 — Build structuring element
 # ---------------------------------------------------------------------------
+
 
 def get_kernel(shape_name: str, ksize: int) -> np.ndarray:
     """
@@ -129,8 +127,8 @@ def get_kernel(shape_name: str, ksize: int) -> np.ndarray:
 # Step 3 — Apply a single morphological operation
 # ---------------------------------------------------------------------------
 
-def apply_morphology(binary: np.ndarray, kernel: np.ndarray,
-                     operation: str) -> np.ndarray:
+
+def apply_morphology(binary: np.ndarray, kernel: np.ndarray, operation: str) -> np.ndarray:
     """
     Apply one of 6 morphological operations to a binary image.
 
@@ -171,6 +169,7 @@ OPERATIONS = ["original", "erode", "dilate", "opening", "closing", "gradient"]
 # ---------------------------------------------------------------------------
 # Step 4 — Build comparison grid
 # ---------------------------------------------------------------------------
+
 
 def build_morphology_grid(
     binary: np.ndarray,
@@ -227,6 +226,7 @@ def build_morphology_grid(
 # ---------------------------------------------------------------------------
 # Step 5 — Analyze structuring element shapes
 # ---------------------------------------------------------------------------
+
 
 def analyze_element_shapes() -> str:
     """
@@ -307,6 +307,7 @@ def analyze_element_shapes() -> str:
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main():
     output_dir = Path("../data/processed/day_16")
