@@ -240,8 +240,6 @@ def analyze_element_shapes() -> str:
     Returns:
         Multi-line string for terminal output.
     """
-    import numpy as np
-    import cv2
 
     lines = []
     lines.append("=" * 60)
