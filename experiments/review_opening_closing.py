@@ -4,10 +4,11 @@ Goal: When to use erode/dilate/opening/closing — 4 real scenarios.
 Runtime: ~3 min
 """
 
-import cv2
-import numpy as np
 from pathlib import Path
+
+import cv2
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 def make_scene() -> np.ndarray:
@@ -48,13 +49,14 @@ k = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
 
 eroded = cv2.erode(binary, k, iterations=1)
 dilated = cv2.dilate(binary, k, iterations=1)
-opened = cv2.morphologyEx(binary, cv2.MORPH_OPEN, k)    # erode -> dilate
-closed = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, k)   # dilate -> erode
+opened = cv2.morphologyEx(binary, cv2.MORPH_OPEN, k)  # erode -> dilate
+closed = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, k)  # dilate -> erode
+oc = cv2.morphologyEx(opened, cv2.MORPH_CLOSE, k)  # open -> close (industry standard)
 
 # ------------------------------------------------
 # Side-by-side comparison — 1 row, 5 columns
 # ------------------------------------------------
-fig, axes = plt.subplots(1, 5, figsize=(15, 4.0))
+fig, axes = plt.subplots(1, 6, figsize=(18, 4.0))
 
 titles = [
     "Original",
@@ -62,6 +64,7 @@ titles = [
     "Dilate",
     "Open",
     "Close",
+    "Open+Close",
 ]
 subtitles = [
     "",
@@ -69,8 +72,9 @@ subtitles = [
     "[OK] Gaps filled\n[!!] Noise grows",
     "[OK] Noise gone\n[OK] Size preserved",
     "[OK] Holes filled\n[OK] Gaps closed",
+    "[OK] Noise gone\n[OK] Holes+gap fixed",
 ]
-images = [binary, eroded, dilated, opened, closed]
+images = [binary, eroded, dilated, opened, closed, oc]
 
 for idx, (img, title, sub) in enumerate(zip(images, titles, subtitles)):
     ax = axes[idx]
@@ -93,8 +97,12 @@ print(f"{'Operation':<12} {'White px':>8} {'Δ vs original':>12}")
 print("-" * 35)
 orig_count = np.count_nonzero(binary)
 for name, result in [
-    ("original", binary), ("erode", eroded), ("dilate", dilated),
-    ("open", opened), ("close", closed),
+    ("original", binary),
+    ("erode", eroded),
+    ("dilate", dilated),
+    ("open", opened),
+    ("close", closed),
+    ("open+close", oc),
 ]:
     count = np.count_nonzero(result)
     delta = count - orig_count
