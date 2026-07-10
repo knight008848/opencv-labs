@@ -1,6 +1,6 @@
 """
 Day 16 (Review) / 2026-07-09
-Goal: When to use erode/dilate/opening/closing — 4 real scenarios.
+Goal: When to use erode/dilate/opening/closing — 4 real scenarios. (Vertical layout)
 Runtime: ~3 min
 """
 
@@ -54,9 +54,9 @@ closed = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, k)  # dilate -> erode
 oc = cv2.morphologyEx(opened, cv2.MORPH_CLOSE, k)  # open -> close (industry standard)
 
 # ------------------------------------------------
-# Side-by-side comparison — 1 row, 5 columns
+# Vertical comparison — 6 rows, 1 column
 # ------------------------------------------------
-fig, axes = plt.subplots(1, 6, figsize=(18, 4.0))
+fig, axes = plt.subplots(6, 1, figsize=(5.5, 14))
 
 titles = [
     "Original",
@@ -79,7 +79,7 @@ images = [binary, eroded, dilated, opened, closed, oc]
 for idx, (img, title, sub) in enumerate(zip(images, titles, subtitles)):
     ax = axes[idx]
     ax.imshow(img, cmap="gray", vmin=0, vmax=255)
-    ax.set_title(f"{title}\n{sub}", fontsize=7.5, linespacing=1.3)
+    ax.set_title(f"{title}\n{sub}", fontsize=10, linespacing=1.3)
     ax.axis("off")
 
 plt.tight_layout(pad=0.5)
