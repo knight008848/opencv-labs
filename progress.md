@@ -5,11 +5,11 @@
 ## 当前状态
 
 - **开始日期：** 2026-06-09
-- **当前天数：** Day 16 / 30
-- **当前模块：** 模块 7 概念 B+C — 腐蚀/膨胀/开运算/闭运算 + 结构元素对比（已完结）
-- **完成率：** 53%
+- **当前天数：** Day 17 / 30
+- **当前模块：** 模块 8 概念 A — 轮廓提取（findContours + drawContours + 层级）（已完结）
+- **完成率：** 57%
 - **最终项目：** 具身视觉数据管道（MP4 -> 结构化观察数据）
-- **累计编码时间：** ~20 小时
+- **累计编码时间：** ~21 小时
 
 ---
 
@@ -34,10 +34,33 @@
 | 06-24 | Day 14 | 阶段测试 2 | - | 87% (8.7/10) | ~0.5h | 模块 4-6 综合测试 |
 | 06-29 | Day 15 | 模块 7 | 2/2 | - | ~2h | 3 速练 + 二值化对比报告 + BINARY/BINARY_INV + 真实图验证 + code review 修复 |
 | 07-02 | Day 16 | 模块 7 | 3/3 | 90% (4.5/5) | ~1.5h | 形态学 6 操作对比 + 3 种结构元素 + 合成含噪二值图 + 网格图分析 |
+| 07-14 | Day 17 | 模块 8 | 1/1 | - | ~1h | 轮廓提取 Pipeline：灰度→Canny→findContours→面积过滤→彩色标注→debug 网格 |
 
 ---
 
 ## 每日学习日志
+
+### Day 17 (2026-07-14) — 模块 8 概念 A：轮廓提取
+
+**完成事项：**
+- [x] 骨架搭建：load_image / preprocess / find_objects / draw_labeled_objects / build_debug_grid
+- [x] find_objects：findContours + RETR_EXTERNAL + CHAIN_APPROX_SIMPLE + area 过滤 + 降序排序
+- [x] get_color_palette：HSV 色相均匀采样 → BGR 元组，保证轮廓颜色区分
+- [x] draw_labeled_objects：逐轮廓上色 + cv2.moments 质心 + putText 标注 ID/面积
+- [x] build_debug_grid：2×2 管线中间结果可视化
+- [x] main：PORTABLE 路径 + 真实照片自动缩放 + 全流程接通
+- [x] 空轮廓保护（get_color_palette(0) 不会崩溃）
+- [x] 跑通 IMG_0701.png：找到 10 个物体，面积 769~2,202 px²
+
+**关键发现：**
+- Canny 边缘占比 2.3%，阈值 (50, 150) 对桌面场景适中——没有过度噪点也没漏主要轮廓
+- CHAIN_APPROX_SIMPLE 压缩后轮廓点数大幅减少，但 contourArea 精度不受影响
+- 路径写死 vs SCRIPT_DIR/PROJECT_DIR 可移植性差异明显——后者在 VM 和本地之间自动适配
+
+**复盘三问：**
+1. findContours 返回的是坐标列表还是二值图？坐标列表。每个轮廓是一组 `(x, y)` 点，不是像素掩码。这是"图像处理"和"图像分析"的分水岭。
+2. RETR_EXTERNAL vs RETR_TREE 什么时候用？只数物体个数→EXTERNAL；需要知道物体嵌套关系（如在框里的文字）→TREE。
+3. 轮廓 Pipeline 和最终项目的关系？数物体+算属性正是最终项目"多 ROI 分窗分析"的核心：每个 ROI 独立做轮廓提取和特征计算。
 
 ### Day 15 (2026-06-29) — 模块 7 概念 A：三种二值化策略 + BINARY vs BINARY_INV
 
@@ -310,10 +333,10 @@
 ```
 Week 1 图像基石:     7/7 天  ✓
 Week 2 图像变换:     7/7 天  ✓
-Week 3 图像分析:     2/7 天
+Week 3 图像分析:     3/7 天
 Week 4 进阶+项目:    0/9 天  (含 Day 29-30 项目冲刺)
 ----------------------------------------------
-总进度:             16/30 天
+总进度:             17/30 天
 ```
 
 ---
@@ -324,4 +347,5 @@ Week 4 进阶+项目:    0/9 天  (含 Day 29-30 项目冲刺)
 - [x] Day 15: 模块 7 概念 A — 二值化（全局/Otsu/自适应）+ BINARY vs BINARY_INV
 - [x] Day 16: 模块 7 概念 B+C — 腐蚀/膨胀/开运算/闭运算 + 结构元素对比
 - [x] **模块 7 测验** — 90% (4.5/5) Q5 二值化放在透视前 [A]
-- [ ] Day 17: 模块 8 概念 A — 轮廓提取（findContours + drawContours + 层级）
+- [x] Day 17: 模块 8 概念 A — 轮廓提取（findContours + drawContours + 层级）
+- [ ] Day 18: 模块 8 概念 B+C — 轮廓几何属性 + approxPolyDP 形状分类 + 模块 8 测验
