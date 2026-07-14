@@ -8,6 +8,10 @@ Runtime: ~45 min
 from pathlib import Path
 
 import cv2
+
+# Resolve paths relative to this script's location
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_DIR = SCRIPT_DIR.parent
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -26,8 +30,10 @@ def load_image(path: str | Path) -> np.ndarray:
     Returns:
         uint8 BGR image, shape (H, W, 3).
     """
-    # TODO: cv2.imread + error handling
-    ...
+    img = cv2.imread(path)
+    if img is None:
+        raise FileNotFoundError(f"Image not found: {path}")
+    return img
 
 
 # ---------------------------------------------------------------------------
@@ -49,8 +55,9 @@ def preprocess(gray: np.ndarray) -> np.ndarray:
     Returns:
         uint8 edge image (binary: 0 or 255).
     """
-    # TODO: GaussianBlur -> Canny
-    ...
+
+    gray_blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    return cv2.Canny(gray_blur, 50, 150)
 
 
 # ---------------------------------------------------------------------------
@@ -75,8 +82,12 @@ def find_objects(edge: np.ndarray, min_area: int = 500) -> list[np.ndarray]:
     Returns:
         List of contour arrays, each shape (N, 1, 2).
     """
-    # TODO: findContours + area filter + sort
-    ...
+    contours, _ = cv2.findContours(
+        edge, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+    )
+
+    filtered = [c for c in contours if cv2.contourArea(c) >= min_area]
+    return sorted(filtered, key=cv2.contourArea, reverse=True)
 
 
 # ---------------------------------------------------------------------------
@@ -95,8 +106,13 @@ def get_color_palette(n: int) -> list[tuple[int, int, int]]:
     Returns:
         List of n BGR tuples like [(B, G, R), ...].
     """
-    # TODO: generate n distinct colors
-    ...
+    
+    hsv = np.zeros((1, n, 3), dtype=np.uint8)
+    hsv[0, :, 0] = np.linspace(0, 179, n, dtype=np.uint8)  # evenly spaced hues
+    hsv[0, :, 1] = 255  # full saturation
+    hsv[0, :, 2] = 255  # full value
+    bgr = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+    return [tuple(int(v) for v in c) for c in bgr[0]]
 
 
 def draw_labeled_objects(
@@ -122,8 +138,30 @@ def draw_labeled_objects(
         output_dir / "day_17_labeled.jpg"
         output_dir / "day_17_labeled.png"  (lossless backup)
     """
-    # TODO: drawContours + moments centroid + putText
-    ...
+
+    colors = get_color_palette(len(contours))
+    for i, c in enumerate(contours):
+        color = colors[i]
+
+        cv2.drawContours(
+            image, contours, -1, color, thickness=2
+        )
+        moments = cv2.moments(c)
+        if moments["m00"] > 0:
+            x = int(moments["m10"] / moments["m00"])
+            y = int(moments["m01"] / moments["m00"])
+            cv2.putText(
+                image,
+                f"ID:{i} Area:{int(cv2.contourArea(c))}",
+                (x, y),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (0, 0, 255),
+                1,
+            )
+
+    cv2.imwrite(str(output_dir / "day_17_labeled.jpg"), image)
+    cv2.imwrite(str(output_dir / "day_17_labeled.png"), image)
 
 
 # ---------------------------------------------------------------------------
@@ -146,13 +184,43 @@ def build_debug_grid(
         3. Labeled result (contours + annotations)
         4. (optional) Area histogram of detected objects
 
-    HINT: Use plt.subplots(2, 2, figsize=(10, 8)). Save with tight_layout.
-
     Saves:
         output_dir / "day_17_debug.png"
     """
-    # TODO: build matplotlib grid with imshow
-    ...
+    fig, axes = plt.subplots(2, 2, figsize=(10, 8))
+    fig.suptitle("Contour Detection Pipeline", fontsize=14)
+
+    # Panel 1: Grayscale original
+    axes[0, 0].imshow(gray, cmap="gray")
+    axes[0, 0].set_title("1. Grayscale Input")
+    axes[0, 0].axis("off")
+
+    # Panel 2: Edge map
+    axes[0, 1].imshow(edge, cmap="gray")
+    axes[0, 1].set_title("2. Canny Edges")
+    axes[0, 1].axis("off")
+
+    # Panel 3: Labeled result (BGR -> RGB for matplotlib)
+    labeled_rgb = cv2.cvtColor(labeled, cv2.COLOR_BGR2RGB)
+    axes[1, 0].imshow(labeled_rgb)
+    axes[1, 0].set_title("3. Labeled Objects")
+    axes[1, 0].axis("off")
+
+    # Panel 4: Info placeholder (contour areas not available here)
+    axes[1, 1].text(
+        0.5, 0.5,
+        "Contour area histogram\ncan be added after\nfind + draw steps.",
+        ha="center", va="center", fontsize=12,
+        transform=axes[1, 1].transAxes,
+    )
+    axes[1, 1].set_title("4. Stats")
+    axes[1, 1].axis("off")
+
+    plt.tight_layout()
+    save_path = output_dir / "day_17_debug.png"
+    fig.savefig(str(save_path), dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"  Saved debug grid: {save_path}")
 
 
 # ---------------------------------------------------------------------------
@@ -161,28 +229,26 @@ def build_debug_grid(
 
 
 def main():
-    output_dir = Path("../data/processed/day_17")
+    output_dir = PROJECT_DIR / "data" / "processed" / "day_17"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # --- Config ---
-    # TODO: Change this to a real photo path when you have one.
-    # For now, we use a synthetic test image.
-    # image_path = Path("../data/raw/your_desk_photo.jpg")
-    # image_bgr = load_image(image_path)
+    # --- Load a real desk-scene photo ---
+    image_path = PROJECT_DIR / "data" / "raw" / "IMG_0701.png"
+    print(f"[1/5] Loading {image_path.name}...")
+    image_bgr = load_image(image_path)
+    h, w = image_bgr.shape[:2]
+    print(f"  Original size: {w}x{h}")
 
-    # --- Fallback: create a synthetic test scene ---
-    print("[1/5] Creating synthetic test scene...")
-    # TODO: generate a simple binary image with several distinct shapes
-    # (rectangles, circles, triangles) that simulates "objects on a desk"
-    image_bgr = np.ones((600, 800, 3), dtype=np.uint8) * 200  # light gray bg
-    # Draw some colored shapes as stand-in objects
-    cv2.rectangle(image_bgr, (50, 50), (200, 200), (50, 100, 200), -1)   # blue rect
-    cv2.circle(image_bgr, (400, 150), 80, (50, 200, 100), -1)            # green circle
-    cv2.rectangle(image_bgr, (600, 50), (750, 200), (100, 50, 200), -1)  # red rect
-    cv2.rectangle(image_bgr, (100, 350), (300, 550), (200, 100, 50), -1) # cyan rect
-    cv2.circle(image_bgr, (550, 450), 100, (50, 100, 200), -1)           # blue circle
-    cv2.imwrite(str(output_dir / "synthetic_input.jpg"), image_bgr)
-    print(f"  Saved synthetic input: {output_dir / 'synthetic_input.jpg'}")
+    # Resize if too large (keep aspect ratio, max dim 1200px)
+    max_dim = 1200
+    if max(h, w) > max_dim:
+        scale = max_dim / max(h, w)
+        new_size = (int(w * scale), int(h * scale))
+        image_bgr = cv2.resize(image_bgr, new_size, interpolation=cv2.INTER_AREA)
+        print(f"  Resized to: {new_size[0]}x{new_size[1]}")
+
+    # Save a copy of input
+    cv2.imwrite(str(output_dir / "input.jpg"), image_bgr)
 
     # --- Pipeline ---
     print("[2/5] Converting to grayscale...")
@@ -190,27 +256,29 @@ def main():
     print(f"  Gray shape: {gray.shape}")
 
     print("[3/5] Running Canny edge detection...")
-    # TODO: call preprocess(gray)
-    edge = np.zeros_like(gray)  # placeholder
+    edge = preprocess(gray)
     cv2.imwrite(str(output_dir / "edges.png"), edge)
+    nonzero = cv2.countNonZero(edge)
+    print(f"  Edge pixels: {nonzero}/{edge.size} ({100 * nonzero / edge.size:.1f}%)")
 
     print("[4/5] Finding and filtering contours...")
-    # TODO: call find_objects(edge, min_area=500)
-    contours: list[np.ndarray] = []  # placeholder
+    contours = find_objects(edge, min_area=500)
 
     if not contours:
         print("  WARNING: No contours found. Adjust Canny thresholds or")
         print("  dilate the edge map to close gaps between edge pixels.")
-
-    print(f"  Found {len(contours)} objects (filtered area >= 500)")
+    else:
+        areas = [cv2.contourArea(c) for c in contours]
+        print(f"  Found {len(contours)} objects (filtered area >= 500)")
+        print(f"  Areas: min={int(min(areas))}, max={int(max(areas))}, "
+              f"total={int(sum(areas))}")
 
     print("[5/5] Drawing labels and saving results...")
-    # TODO: call draw_labeled_objects(image_bgr.copy(), contours, output_dir)
-    # TODO: call build_debug_grid(gray, edge, labeled, output_dir)
+    labeled = image_bgr.copy()
+    draw_labeled_objects(labeled, contours, output_dir)
+    build_debug_grid(gray, edge, labeled, output_dir)
 
     print(f"\nDone. View results in {output_dir}/")
-    print("Tip: Replace the synthetic image with a real desk photo")
-    print("  and tune Canny thresholds for best detection.")
 
 
 if __name__ == "__main__":
