@@ -8,12 +8,12 @@ Runtime: ~45 min
 from pathlib import Path
 
 import cv2
+import matplotlib.pyplot as plt
+import numpy as np
 
 # Resolve paths relative to this script's location
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = SCRIPT_DIR.parent
-import matplotlib.pyplot as plt
-import numpy as np
 
 # ---------------------------------------------------------------------------
 # Step 1 — Load an input image
@@ -82,9 +82,7 @@ def find_objects(edge: np.ndarray, min_area: int = 500) -> list[np.ndarray]:
     Returns:
         List of contour arrays, each shape (N, 1, 2).
     """
-    contours, _ = cv2.findContours(
-        edge, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-    )
+    contours, _ = cv2.findContours(edge, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     filtered = [c for c in contours if cv2.contourArea(c) >= min_area]
     return sorted(filtered, key=cv2.contourArea, reverse=True)
@@ -106,7 +104,7 @@ def get_color_palette(n: int) -> list[tuple[int, int, int]]:
     Returns:
         List of n BGR tuples like [(B, G, R), ...].
     """
-    
+
     hsv = np.zeros((1, n, 3), dtype=np.uint8)
     hsv[0, :, 0] = np.linspace(0, 179, n, dtype=np.uint8)  # evenly spaced hues
     hsv[0, :, 1] = 255  # full saturation
@@ -139,13 +137,18 @@ def draw_labeled_objects(
         output_dir / "day_17_labeled.png"  (lossless backup)
     """
 
+    # Early return if no contours (get_color_palette(0) would crash)
+    if not contours:
+        cv2.imwrite(str(output_dir / "day_17_labeled.jpg"), image)
+        cv2.imwrite(str(output_dir / "day_17_labeled.png"), image)
+        return
+
     colors = get_color_palette(len(contours))
     for i, c in enumerate(contours):
         color = colors[i]
 
-        cv2.drawContours(
-            image, contours, -1, color, thickness=2
-        )
+        # Draw only the i-th contour (contourIdx=i), not all at once
+        cv2.drawContours(image, contours, i, color, thickness=2)
         moments = cv2.moments(c)
         if moments["m00"] > 0:
             x = int(moments["m10"] / moments["m00"])
@@ -208,9 +211,12 @@ def build_debug_grid(
 
     # Panel 4: Info placeholder (contour areas not available here)
     axes[1, 1].text(
-        0.5, 0.5,
+        0.5,
+        0.5,
         "Contour area histogram\ncan be added after\nfind + draw steps.",
-        ha="center", va="center", fontsize=12,
+        ha="center",
+        va="center",
+        fontsize=12,
         transform=axes[1, 1].transAxes,
     )
     axes[1, 1].set_title("4. Stats")
@@ -270,8 +276,7 @@ def main():
     else:
         areas = [cv2.contourArea(c) for c in contours]
         print(f"  Found {len(contours)} objects (filtered area >= 500)")
-        print(f"  Areas: min={int(min(areas))}, max={int(max(areas))}, "
-              f"total={int(sum(areas))}")
+        print(f"  Areas: min={int(min(areas))}, max={int(max(areas))}, total={int(sum(areas))}")
 
     print("[5/5] Drawing labels and saving results...")
     labeled = image_bgr.copy()
