@@ -5,15 +5,14 @@ Goal: Extend Day 17 pipeline — compute geometry properties + shape classificat
 Runtime: ~1 h
 """
 
+import csv
 from collections import Counter
 from pathlib import Path
 
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-import csv
-
-from day_17_contours import load_image, preprocess, find_objects, get_color_palette
+from day_17_contours import find_objects, load_image, preprocess
 
 # Resolve paths relative to this script's location
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -55,11 +54,11 @@ def compute_properties(cnt: np.ndarray) -> dict:
     else:
         cx = int(M["m10"] / M["m00"])
         cy = int(M["m01"] / M["m00"])
-    
+
     bbox_x, bbox_y, bbox_w, bbox_h = cv2.boundingRect(cnt)
     ((rotated_cx, rotated_cy), (rotated_w, rotated_h), rotated_angle) = cv2.minAreaRect(cnt)
 
-    circularity = 4 * np.pi * area / (perimeter ** 2)
+    circularity = 4 * np.pi * area / (perimeter**2)
     aspect_ratio = rotated_w / rotated_h
 
     return {
@@ -77,9 +76,8 @@ def compute_properties(cnt: np.ndarray) -> dict:
         "rotated_h": rotated_h,
         "rotated_angle": rotated_angle,
         "circularity": circularity,
-        "aspect_ratio": aspect_ratio
+        "aspect_ratio": aspect_ratio,
     }
-
 
 
 def build_property_table(
@@ -137,7 +135,6 @@ def classify_shape(cnt: np.ndarray) -> str:
     approx = cv2.approxPolyDP(cnt, epsilon, True)
     vertices = len(approx)
 
-
     if vertices == 3:
         return "Triangle"
     elif vertices == 4:
@@ -148,7 +145,7 @@ def classify_shape(cnt: np.ndarray) -> str:
         return "Irregular"
 
 
-   # ==============================  NEW  ======================================
+# ==============================  NEW  ======================================
 # Drawing — overlay bounding boxes + shape labels
 # ==============================
 
@@ -182,9 +179,11 @@ def draw_boxes(
         cv2.rectangle(image, (x, y), (x + w, y + h), (255, 0, 0), 2)
 
         # --- 2. Rotated bounding box (green) ---
-        rotated = ((props["rotated_cx"], props["rotated_cy"]),
-                   (props["rotated_w"], props["rotated_h"]),
-                   props["rotated_angle"])
+        rotated = (
+            (props["rotated_cx"], props["rotated_cy"]),
+            (props["rotated_w"], props["rotated_h"]),
+            props["rotated_angle"],
+        )
         box = cv2.boxPoints(rotated)
         box = np.int32(box)
         cv2.drawContours(image, [box], 0, (0, 255, 0), 2)
@@ -220,15 +219,12 @@ def save_csv(props_list: list[dict], output_path: Path) -> None:
     HINT: Round float values to 2 decimal places for readability.
     """
     fieldnames = ["id", "shape", "area", "perimeter", "circularity", "aspect_ratio", "cx", "cy"]
-    
+
     with open(output_path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         for row in props_list:
-            rounded = {
-                k: round(v, 2) if isinstance(v, float) else v
-                for k, v in row.items()
-            }
+            rounded = {k: round(v, 2) if isinstance(v, float) else v for k, v in row.items()}
             writer.writerow(rounded)
 
 
@@ -287,7 +283,7 @@ def build_debug_grid(
     # Panel 4: CSV text table
     with open(csv_path, "r") as f:
         csv_text = f.read()
-        
+
     axes[1, 1].text(
         0.05,
         0.95,
@@ -306,7 +302,6 @@ def build_debug_grid(
     fig.savefig(str(save_path), dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"  Saved debug grid: {save_path}")
-
 
 
 # ==============================  Main  ======================================
@@ -352,7 +347,6 @@ def main():
     # --- Classify shapes ---
     print("[4/7] Classifying shapes...")
     shapes = [classify_shape(c) for c in contours]
-    from collections import Counter
     shape_counts = Counter(shapes)
     for s, n in shape_counts.items():
         print(f"  {s}: {n}")
