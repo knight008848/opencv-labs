@@ -10,27 +10,13 @@ from pathlib import Path
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
+import csv
 
 from day_17_contours import load_image, preprocess, find_objects, get_color_palette
 
 # Resolve paths relative to this script's location
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = SCRIPT_DIR.parent
-
-# ---------------------------------------------------------------------------
-# TODO — Reuse Day 17 functions (import or copy)
-#
-# You already have these working functions from day_17_contours.py:
-#   load_image()
-#   preprocess(gray) -> edge
-#   find_objects(edge, min_area) -> contours (sorted by area descending)
-#   get_color_palette(n) -> list of distinct BGR tuples
-#
-# HINT: Instead of copy-pasting, you can put shared utilities in src/ and
-# import them. Or just copy the four functions above — Day 18 adds NEW
-# functions below. The choice is yours.
-# ---------------------------------------------------------------------------
-
 
 # ==============================  NEW  ======================================
 # Concept B — Contour Geometric Properties
@@ -56,9 +42,43 @@ def compute_properties(cnt: np.ndarray) -> dict:
         rotated_cx, rotated_cy, rotated_w, rotated_h, rotated_angle,
         circularity, aspect_ratio
     """
-    # TODO: Compute each property and store in a dict
+
+    area = cv2.contourArea(cnt)
+
+    perimeter = cv2.arcLength(cnt, True)
+
     # - If m00 == 0, set cx/cy = 0 (prevent ZeroDivisionError)
-    raise NotImplementedError("compute_properties")
+    M = cv2.moments(cnt)
+    if M["m00"] == 0:
+        cx, cy = 0, 0
+    else:
+        cx = int(M["m10"] / M["m00"])
+        cy = int(M["m01"] / M["m00"])
+    
+    bbox_x, bbox_y, bbox_w, bbox_h = cv2.boundingRect(cnt)
+    ((rotated_cx, rotated_cy), (rotated_w, rotated_h), rotated_angle) = cv2.minAreaRect(cnt)
+
+    circularity = 4 * np.pi * area / (perimeter ** 2)
+    aspect_ratio = rotated_w / rotated_h
+
+    return {
+        "area": area,
+        "perimeter": perimeter,
+        "cx": cx,
+        "cy": cy,
+        "bbox_x": bbox_x,
+        "bbox_y": bbox_y,
+        "bbox_w": bbox_w,
+        "bbox_h": bbox_h,
+        "rotated_cx": rotated_cx,
+        "rotated_cy": rotated_cy,
+        "rotated_w": rotated_w,
+        "rotated_h": rotated_h,
+        "rotated_angle": rotated_angle,
+        "circularity": circularity,
+        "aspect_ratio": aspect_ratio
+    }
+
 
 
 def build_property_table(
@@ -71,9 +91,13 @@ def build_property_table(
     Iterates over contours, calls compute_properties + shape label,
     returns a list that can be written as CSV or printed as a table.
     """
-    # TODO: zip(contours, shapes), call compute_properties for each,
-    #       prepend "id" field, collect into a list.
-    raise NotImplementedError("build_property_table")
+    props_list = []
+    for i, (cnt, shape_label) in enumerate(zip(contours, shapes)):
+        props = compute_properties(cnt)
+        props["id"] = i
+        props["shape"] = shape_label
+        props_list.append(props)
+    return props_list
 
 
 # ==============================  NEW  ======================================
@@ -106,11 +130,24 @@ def classify_shape(cnt: np.ndarray) -> str:
     Returns:
         One of: "Triangle", "Rectangle", "Circle", "Irregular"
     """
-    # TODO: Implement the 5-step pipeline above.
-    raise NotImplementedError("classify_shape")
+
+    perimeter = cv2.arcLength(cnt, True)
+    epsilon = 0.02 * perimeter
+    approx = cv2.approxPolyDP(cnt, epsilon, True)
+    vertices = len(approx)
 
 
-# ==============================  NEW  ======================================
+    if vertices == 3:
+        return "Triangle"
+    elif vertices == 4:
+        return "Rectangle"
+    elif vertices >= 8:
+        return "Circle"
+    else:
+        return "Irregular"
+
+
+   # ==============================  NEW  ======================================
 # Drawing — overlay bounding boxes + shape labels
 # ==============================
 
@@ -138,11 +175,30 @@ def draw_boxes(
 
     This function draws on `image` in-place (no return value).
     """
-    # TODO: For each (contour, shape, props):
-    #   1. Extract bbox_x/y/w/h from props, draw blue rectangle
-    #   2. Build rotated rect tuple, compute boxPoints, draw green polygon
-    #   3. Put shape text above centroid
-    raise NotImplementedError("draw_boxes")
+    for i, (cnt, shape, props) in enumerate(zip(contours, shapes, props_list)):
+        # --- 1. Axis-aligned bounding box (blue) ---
+        x, y, w, h = props["bbox_x"], props["bbox_y"], props["bbox_w"], props["bbox_h"]
+        cv2.rectangle(image, (x, y), (x + w, y + h), (255, 0, 0), 2)
+
+        # --- 2. Rotated bounding box (green) ---
+        rotated = ((props["rotated_cx"], props["rotated_cy"]),
+                   (props["rotated_w"], props["rotated_h"]),
+                   props["rotated_angle"])
+        box = cv2.boxPoints(rotated)
+        box = np.int32(box)
+        cv2.drawContours(image, [box], 0, (0, 255, 0), 2)
+
+        # --- 3. Shape label above centroid ---
+        cx, cy = props["cx"], props["cy"]
+        cv2.putText(
+            image,
+            f"{shape}",
+            (cx, cy - 10),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (0, 0, 255),
+            1,
+        )
 
 
 # ==============================  NEW  ======================================
@@ -162,9 +218,17 @@ def save_csv(props_list: list[dict], output_path: Path) -> None:
 
     HINT: Round float values to 2 decimal places for readability.
     """
-    # TODO: Open output_path for writing, write header row,
-    #       write one data row per dict in props_list.
-    raise NotImplementedError("save_csv")
+    fieldnames = ["id", "shape", "area", "perimeter", "circularity", "aspect_ratio", "cx", "cy"]
+    
+    with open(output_path, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in props_list:
+            rounded = {
+                k: round(v, 2) if isinstance(v, float) else v
+                for k, v in row.items()
+            }
+            writer.writerow(rounded)
 
 
 # ==============================  NEW  ======================================
@@ -199,7 +263,48 @@ def build_debug_grid(
     #       Panel 1-2: grayscale + edge (cmap="gray")
     #       Panel 3: labeled image (BGR→RGB for matplotlib)
     #       Panel 4: CSV text table
-    raise NotImplementedError("build_debug_grid")
+
+    fig, axes = plt.subplots(2, 2, figsize=(10, 8))
+    fig.suptitle("Contour Detection Pipeline", fontsize=14)
+
+    # Panel 1: Grayscale original
+    axes[0, 0].imshow(gray, cmap="gray")
+    axes[0, 0].set_title("1. Grayscale Input")
+    axes[0, 0].axis("off")
+
+    # Panel 2: Edge map
+    axes[0, 1].imshow(edge, cmap="gray")
+    axes[0, 1].set_title("2. Canny Edges")
+    axes[0, 1].axis("off")
+
+    # Panel 3: Labeled result (BGR -> RGB for matplotlib)
+    labeled_rgb = cv2.cvtColor(labeled, cv2.COLOR_BGR2RGB)
+    axes[1, 0].imshow(labeled_rgb)
+    axes[1, 0].set_title("3. Labeled Objects")
+    axes[1, 0].axis("off")
+
+    # Panel 4: CSV text table
+    with open(csv_path, "r") as f:
+        csv_text = f.read()
+        
+    axes[1, 1].text(
+        0.05,
+        0.95,
+        csv_text,
+        ha="center",
+        va="center",
+        fontsize=12,
+        transform=axes[1, 1].transAxes,
+    )
+    axes[1, 1].set_title("4. Stats")
+    axes[1, 1].axis("off")
+
+    plt.tight_layout()
+    save_path = output_dir / "day_18_debug.png"
+    fig.savefig(str(save_path), dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"  Saved debug grid: {save_path}")
+
 
 
 # ==============================  Main  ======================================
