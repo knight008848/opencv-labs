@@ -5,6 +5,7 @@ Goal: Extend Day 17 pipeline — compute geometry properties + shape classificat
 Runtime: ~1 h
 """
 
+from collections import Counter
 from pathlib import Path
 
 import cv2
@@ -316,40 +317,70 @@ def main():
     output_dir = PROJECT_DIR / "data" / "processed" / "day_18"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # --- TODO: Load image (reuse load_image from Day 17) ---
+    # --- Load image (reuse load_image from Day 17) ---
     image_path = PROJECT_DIR / "data" / "raw" / "IMG_0701.png"
-    # TODO: load image, resize if too large (same logic as Day 17)
+    print(f"[1/7] Loading {image_path.name}...")
+    image_bgr = load_image(image_path)
+    h, w = image_bgr.shape[:2]
+    print(f"  Original size: {w}x{h}")
 
-    # --- TODO: Preprocess (reuse preprocess from Day 17) ---
-    # gray = cv2.cvtColor(...)
-    # edge = preprocess(gray)
+    # Resize if too large (keep aspect ratio, max dim 1200px)
+    max_dim = 1200
+    if max(h, w) > max_dim:
+        scale = max_dim / max(h, w)
+        new_size = (int(w * scale), int(h * scale))
+        image_bgr = cv2.resize(image_bgr, new_size, interpolation=cv2.INTER_AREA)
+        print(f"  Resized to: {new_size[0]}x{new_size[1]}")
 
-    # --- TODO: Find contours (reuse find_objects from Day 17) ---
-    # contours = find_objects(edge, min_area=500)
-    # print how many objects found
+    # --- Preprocess (reuse preprocess from Day 17) ---
+    print("[2/7] Converting to grayscale and detecting edges...")
+    gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
+    edge = preprocess(gray)
+    nonzero = cv2.countNonZero(edge)
+    print(f"  Edge pixels: {nonzero}/{edge.size} ({100 * nonzero / edge.size:.1f}%)")
 
-    # --- TODO: Classify shapes ---
-    # shapes = [classify_shape(c) for c in contours]
-    # print shape counts (how many triangles, rectangles, circles...)
+    # --- Find contours (reuse find_objects from Day 17) ---
+    print("[3/7] Finding contours...")
+    contours = find_objects(edge, min_area=500)
+    if not contours:
+        print("  WARNING: No contours found. Adjust Canny thresholds or dilate edge map.")
+    else:
+        areas = [cv2.contourArea(c) for c in contours]
+        print(f"  Found {len(contours)} objects (filtered area >= 500)")
+        print(f"  Areas: min={int(min(areas))}, max={int(max(areas))}, total={int(sum(areas))}")
 
-    # --- TODO: Compute properties ---
-    # props_list = build_property_table(contours, shapes)
+    # --- Classify shapes ---
+    print("[4/7] Classifying shapes...")
+    shapes = [classify_shape(c) for c in contours]
+    from collections import Counter
+    shape_counts = Counter(shapes)
+    for s, n in shape_counts.items():
+        print(f"  {s}: {n}")
 
-    # --- TODO: Draw results ---
-    # labeled = image_bgr.copy()
-    # draw_boxes(labeled, contours, shapes, props_list)
+    # --- Compute properties ---
+    print("[5/7] Computing geometric properties...")
+    props_list = build_property_table(contours, shapes)
 
-    # --- TODO: Save labeled image ---
-    # cv2.imwrite(output_dir / "day_18_labeled.jpg", labeled)
+    # --- Draw results ---
+    print("[6/7] Drawing annotations...")
+    labeled = image_bgr.copy()
+    draw_boxes(labeled, contours, shapes, props_list)
 
-    # --- TODO: Save CSV report ---
-    # csv_path = output_dir / "day_18_report.csv"
-    # save_csv(props_list, csv_path)
+    # --- Save labeled image ---
+    labeled_jpg = output_dir / "day_18_labeled.jpg"
+    cv2.imwrite(str(labeled_jpg), labeled)
+    print(f"  Saved labeled image: {labeled_jpg}")
 
-    # --- TODO: Build debug grid ---
-    # build_debug_grid(gray, edge, labeled, csv_path, output_dir)
+    # --- Save CSV report ---
+    csv_path = output_dir / "day_18_report.csv"
+    save_csv(props_list, csv_path)
+    print(f"  Saved CSV report: {csv_path}")
 
-    # --- TODO: Print summary ---
+    # --- Build debug grid ---
+    print("[7/7] Building debug visualization...")
+    build_debug_grid(gray, edge, labeled, csv_path, output_dir)
+
+    # --- Print summary ---
     print(f"\nDone. View results in {output_dir}/")
 
 
