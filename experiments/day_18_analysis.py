@@ -291,9 +291,10 @@ def build_debug_grid(
         0.05,
         0.95,
         csv_text,
-        ha="center",
-        va="center",
-        fontsize=12,
+        ha="left",
+        va="top",
+        fontsize=8,
+        fontfamily="monospace",
         transform=axes[1, 1].transAxes,
     )
     axes[1, 1].set_title("4. Stats")
