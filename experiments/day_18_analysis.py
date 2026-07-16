@@ -314,7 +314,7 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # --- Load image (reuse load_image from Day 17) ---
-    image_path = PROJECT_DIR / "data" / "raw" / "IMG_0701.png"
+    image_path = PROJECT_DIR / "data" / "raw" / "type_test.png"
     print(f"[1/7] Loading {image_path.name}...")
     image_bgr = load_image(image_path)
     h, w = image_bgr.shape[:2]
