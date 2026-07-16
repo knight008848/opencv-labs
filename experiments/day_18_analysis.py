@@ -225,7 +225,8 @@ def save_csv(props_list: list[dict], output_path: Path) -> None:
         writer.writeheader()
         for row in props_list:
             rounded = {k: round(v, 2) if isinstance(v, float) else v for k, v in row.items()}
-            writer.writerow(rounded)
+            filtered = {k: rounded.get(k, "") for k in fieldnames}
+            writer.writerow(filtered)
 
 
 # ==============================  NEW  ======================================
