@@ -342,8 +342,8 @@ def main():
 
     # --- Parameter sweeps ---
     print("[5/6] Running parameter sweeps...")
-    sweep_line_threshold(image_gray, edges, line_result, line_image, output_dir)
-    sweep_circle_param2(image_gray, edges, circle_result, circle_image, output_dir)
+    sweep_line_threshold(edges, [50, 100, 150, 200], output_dir)
+    sweep_circle_param2(image_gray, [20, 30, 40, 50], output_dir)
 
     # --- Debug grid ---
     print("[6/6] Building debug visualization...")
@@ -362,7 +362,11 @@ def main():
     print(f"\n{'='*50}")
     print(f"  Day 19 Hough Detection — Summary")
     print(f"{'='*50}")
-    # TODO: print image size, edge ratio, line count, circle count
+    h, w = image_gray.shape
+    print(f"  Image         : {w} × {h}")
+    print(f"  Edge ratio    : {edge_ratio:.1%}  ({cv2.countNonZero(edges)}/{edges.size} px)")
+    print(f"  Lines detected: {line_count}")
+    print(f"  Circles detect: {circle_count}")
     print(f"{'='*50}")
     print(f"\nView results in {output_dir}/")
 
