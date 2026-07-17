@@ -67,7 +67,6 @@ def detect_lines(
 
     HINT: Use cv2.HoughLinesP with rho=1, theta=np.pi/180.
     """
-    # TODO: cv2.HoughLinesP(...)
     return cv2.HoughLinesP(edges, 1, np.pi/180, threshold, min_line_length, max_line_gap)
 
 
@@ -85,8 +84,6 @@ def draw_lines(
 
     HINT: cv2.line(result, (x1, y1), (x2, y2), color, thickness)
     """
-    # TODO: iterate lines, cv2.line each segment
-
     result = image.copy()
     if lines is not None:
         for line in lines:
@@ -128,7 +125,6 @@ def detect_circles(
     Note: input is GRAYSCALE (not edges), HoughCircles builds its own
     Canny internally.
     """
-    # TODO: cv2.HoughCircles(...)
     return cv2.HoughCircles(gray, cv2.HOUGH_GRADIENT, dp, min_dist, param1, param2, min_radius, max_radius)
 
 
@@ -147,7 +143,6 @@ def draw_circles(
     HINT: cv2.circle for outline (thickness=2), cv2.circle for centre dot (-1)
     HINT: circles[0] gives the array of (cx, cy, r) rows
     """
-    # TODO: iterate circles[0], draw circumference + centre dot
     result = image.copy()
     if circles is not None:
         for circle in circles[0]:
@@ -176,7 +171,6 @@ def sweep_line_threshold(
     call detect_lines -> draw_lines on the edge map (converted to BGR
     then RGB), annotate with count, save as day_19_line_sweep.png.
     """
-    # TODO: build 1×N grid, loop thresholds, detect + draw + annotate
     n = len(thresholds)
     fig, axes = plt.subplots(1, n, figsize=(4*n, 4))
     fig.suptitle("Day 19 — Hough Transform Detection", fontsize=14)
@@ -216,7 +210,6 @@ def sweep_circle_param2(
     semi-transparent background so circles are clearly visible.
     Annotate with param2 value and circle count.
     """
-    # TODO: build 1×N grid, loop param2 values, detect + draw + annotate
     n = len(param2_values)
     fig, axes = plt.subplots(1, n, figsize=(4*n, 4))
     fig.suptitle("Day 19 — Hough Transform Detection", fontsize=14)
@@ -331,20 +324,17 @@ def main():
 
     # --- Line detection ---
     print("[3/6] Running Hough line detection...")
-    # TODO: detect_lines -> draw_lines
     line_result = detect_lines(edges)
     line_count = len(line_result) if line_result is not None else 0
     line_image = draw_lines(image_bgr.copy(), line_result, color=(0, 255, 0), thickness=1)
 
     # --- Circle detection ---
     print("[4/6] Running Hough circle detection...")
-    # TODO: detect_circles -> draw_circles
     circle_result = detect_circles(image_gray)
     circle_count = len(circle_result) if circle_result is not None else 0
     circle_image = draw_circles(image_bgr.copy(), circle_result, color=(0, 255, 0), thickness=2)
 
     # --- Combined overlay ---
-    # TODO: combine lines + circles on one image, save day_19_combined.jpg
     combined = image_bgr.copy()
     combined = draw_lines(combined, line_result, color=(0, 255, 0), thickness=1)
     combined = draw_circles(combined, circle_result, color=(0, 255, 0), thickness=2)
@@ -352,13 +342,11 @@ def main():
 
     # --- Parameter sweeps ---
     print("[5/6] Running parameter sweeps...")
-    # TODO: sweep_line_threshold + sweep_circle_param2
     sweep_line_threshold(image_gray, edges, line_result, line_image, output_dir)
     sweep_circle_param2(image_gray, edges, circle_result, circle_image, output_dir)
 
     # --- Debug grid ---
     print("[6/6] Building debug visualization...")
-    # TODO: build_debug_grid
     build_debug_grid(
         image_gray,
         edges,
