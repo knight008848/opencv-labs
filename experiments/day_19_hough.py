@@ -23,11 +23,22 @@ PROJECT_DIR = SCRIPT_DIR.parent
 # ==============================  Utility  ====================================
 
 
-def load_image(path: str | Path) -> np.ndarray:
-    """Load an image in BGR color. Raise if unreadable."""
+def load_image(path: str | Path, max_size: int | None = 1200) -> np.ndarray:
+    """
+    Load an image in BGR color.  Downscale if the longest side exceeds
+    *max_size* (disabled when *max_size* is None).
+    """
     img = cv2.imread(str(path))
     if img is None:
         raise FileNotFoundError(f"Image not found: {path}")
+
+    if max_size is not None:
+        h, w = img.shape[:2]
+        if max(h, w) > max_size:
+            scale = max_size / max(h, w)
+            new_size = (int(w * scale), int(h * scale))
+            img = cv2.resize(img, new_size, interpolation=cv2.INTER_AREA)
+
     return img
 
 
@@ -290,7 +301,7 @@ def build_debug_grid(
 def main():
     """
     Pipeline:
-      1. Load type_test.png (resize if > 1200px)
+      1. Load type_test.png (auto-downscaled in load_image)
       2. Preprocess: gray -> blur -> Canny
       3. Detect lines + circles with sensible defaults
       4. Draw overlay images (lines only, circles only, combined)
@@ -302,19 +313,12 @@ def main():
     output_dir = PROJECT_DIR / "data" / "processed" / "day_19"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # --- Load & optionally resize ---
+    # --- Load test image (downscaled if too large) ---
     image_path = PROJECT_DIR / "data" / "raw" / "type_test.png"
     print(f"[1/6] Loading {image_path.name}...")
     image_bgr = load_image(image_path)
-    h, w = image_bgr.shape[:2]
-    if max(h, w) > 1200:
-        scale = 1200 / max(h, w)
-        new_size = (int(w * scale), int(h * scale))
-        image_bgr = cv2.resize(image_bgr, new_size, interpolation=cv2.INTER_AREA)
-        print(f"      Resized {w}×{h} → {new_size[0]}×{new_size[1]} "
-              f"({image_bgr.shape[1]}×{image_bgr.shape[0]})")
 
-       # --- Preprocess ---
+    # --- Preprocess ---
     print("[2/6] Converting to grayscale and detecting edges...")
     image_gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
     edges = preprocess(image_gray)
