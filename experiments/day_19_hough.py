@@ -302,10 +302,17 @@ def main():
     output_dir = PROJECT_DIR / "data" / "processed" / "day_19"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # --- Load test image ---
+    # --- Load & optionally resize ---
     image_path = PROJECT_DIR / "data" / "raw" / "type_test.png"
     print(f"[1/6] Loading {image_path.name}...")
     image_bgr = load_image(image_path)
+    h, w = image_bgr.shape[:2]
+    if max(h, w) > 1200:
+        scale = 1200 / max(h, w)
+        new_size = (int(w * scale), int(h * scale))
+        image_bgr = cv2.resize(image_bgr, new_size, interpolation=cv2.INTER_AREA)
+        print(f"      Resized {w}×{h} → {new_size[0]}×{new_size[1]} "
+              f"({image_bgr.shape[1]}×{image_bgr.shape[0]})")
 
        # --- Preprocess ---
     print("[2/6] Converting to grayscale and detecting edges...")
