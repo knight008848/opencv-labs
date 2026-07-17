@@ -158,19 +158,15 @@ def draw_circles(
 
 def sweep_line_threshold(
     edges: np.ndarray,
-    thresholds: list[int],
     output_dir: Path,
+    thresholds: list[int] | None = None,
 ) -> None:
     """
     Run HoughLinesP at multiple *threshold* values and save a 1×N grid.
-
-    Each panel shows detected lines at a given threshold.  The panel
-    title prints the threshold value and the resulting line count.
-
-    HINT: plt.subplots(1, n, figsize=(4*n, 4)). For each threshold,
-    call detect_lines -> draw_lines on the edge map (converted to BGR
-    then RGB), annotate with count, save as day_19_line_sweep.png.
+    Default thresholds: [50, 100, 150, 200].
     """
+    thresholds = thresholds or [50, 100, 150, 200]
+
     n = len(thresholds)
     fig, axes = plt.subplots(1, n, figsize=(4*n, 4))
     fig.suptitle("Day 19 — Hough Transform Detection", fontsize=14)
@@ -197,19 +193,14 @@ def sweep_line_threshold(
 
 def sweep_circle_param2(
     gray: np.ndarray,
-    param2_values: list[int],
     output_dir: Path,
+    param2_values: list[int] | None = None,
 ) -> None:
     """
     Run HoughCircles at multiple *param2* values and save a 1×N grid.
-
-    *param2* is the accumulator threshold — the single most important
-    knob for controlling circle detection sensitivity.
-
-    HINT: Same grid pattern as sweep_line_threshold. Use a white or
-    semi-transparent background so circles are clearly visible.
-    Annotate with param2 value and circle count.
+    Default param2 values: [20, 30, 40, 50].
     """
+    param2_values = param2_values or [20, 30, 40, 50]
     n = len(param2_values)
     fig, axes = plt.subplots(1, n, figsize=(4*n, 4))
     fig.suptitle("Day 19 — Hough Transform Detection", fontsize=14)
@@ -342,8 +333,8 @@ def main():
 
     # --- Parameter sweeps ---
     print("[5/6] Running parameter sweeps...")
-    sweep_line_threshold(edges, [50, 100, 150, 200], output_dir)
-    sweep_circle_param2(image_gray, [20, 30, 40, 50], output_dir)
+    sweep_line_threshold(edges, output_dir)
+    sweep_circle_param2(image_gray, output_dir)
 
     # --- Debug grid ---
     print("[6/6] Building debug visualization...")
