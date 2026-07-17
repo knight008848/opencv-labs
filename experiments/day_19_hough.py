@@ -219,7 +219,7 @@ def sweep_circle_param2(
 
     for ax, param2 in zip(axes, param2_values):
         circles = detect_circles(gray, param2=param2)
-        counts = len(circles) if circles is not None else 0
+        counts = len(circles[0]) if circles is not None else 0
 
         # 在灰度图上画蓝色圆
         bg = np.full_like(gray, 255, dtype=np.uint8)
@@ -335,7 +335,7 @@ def main():
     # --- Circle detection ---
     print("[4/6] Running Hough circle detection...")
     circle_result = detect_circles(image_gray)
-    circle_count = len(circle_result) if circle_result is not None else 0
+    circle_count = len(circle_result[0]) if circle_result is not None else 0
     circle_image = draw_circles(image_bgr.copy(), circle_result, color=(0, 255, 0), thickness=2)
 
     # --- Combined overlay ---
