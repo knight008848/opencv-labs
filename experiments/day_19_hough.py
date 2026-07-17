@@ -146,7 +146,7 @@ def draw_circles(
     result = image.copy()
     if circles is not None:
         for circle in circles[0]:
-            cx, cy, r = circle
+            cx, cy, r = np.round(circle).astype(int)
             cv2.circle(result, (cx, cy), r, color, thickness)
             cv2.circle(result, (cx, cy), 2, color, -1)
 
