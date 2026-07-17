@@ -78,7 +78,7 @@ def detect_lines(
 
     HINT: Use cv2.HoughLinesP with rho=1, theta=np.pi/180.
     """
-    return cv2.HoughLinesP(edges, 1, np.pi/180, threshold, min_line_length, max_line_gap)
+    return cv2.HoughLinesP(edges, 1, np.pi / 180, threshold, min_line_length, max_line_gap)
 
 
 def draw_lines(
@@ -136,7 +136,9 @@ def detect_circles(
     Note: input is GRAYSCALE (not edges), HoughCircles builds its own
     Canny internally.
     """
-    return cv2.HoughCircles(gray, cv2.HOUGH_GRADIENT, dp, min_dist, param1, param2, min_radius, max_radius)
+    return cv2.HoughCircles(
+        gray, cv2.HOUGH_GRADIENT, dp, min_dist, param1, param2, min_radius, max_radius
+    )
 
 
 def draw_circles(
@@ -179,22 +181,21 @@ def sweep_line_threshold(
     thresholds = thresholds or [50, 100, 150, 200]
 
     n = len(thresholds)
-    fig, axes = plt.subplots(1, n, figsize=(4*n, 4))
+    fig, axes = plt.subplots(1, n, figsize=(4 * n, 4))
     fig.suptitle("Day 19 — Hough Transform Detection", fontsize=14)
 
     for ax, threshold in zip(axes, thresholds):
         lines = detect_lines(edges, threshold)
         counts = len(lines) if lines is not None else 0
-    
+
         # 在边缘图上画绿色直线
-        edge_bgr = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)   # 灰度 → BGR
+        edge_bgr = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)  # 灰度 → BGR
         annotated = draw_lines(edge_bgr, lines, color=(0, 255, 0), thickness=1)
         annotated_rgb = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)  # BGR → RGB
 
         ax.imshow(annotated_rgb)
         ax.set_title(f"Threshold: {threshold} — {counts}")
         ax.axis("off")
-    
 
     plt.tight_layout()
     fig.savefig(str(output_dir / "day_19_line_sweep.png"), dpi=150)
@@ -213,7 +214,7 @@ def sweep_circle_param2(
     """
     param2_values = param2_values or [20, 30, 40, 50]
     n = len(param2_values)
-    fig, axes = plt.subplots(1, n, figsize=(4*n, 4))
+    fig, axes = plt.subplots(1, n, figsize=(4 * n, 4))
     fig.suptitle("Day 19 — Hough Transform Detection", fontsize=14)
 
     for ax, param2 in zip(axes, param2_values):
@@ -229,7 +230,6 @@ def sweep_circle_param2(
         ax.imshow(annotated_rgb)
         ax.set_title(f"Param2: {param2} — {counts}")
         ax.axis("off")
-
 
     plt.tight_layout()
     fig.savefig(str(output_dir / "day_19_circle_sweep.png"), dpi=150)
@@ -273,7 +273,9 @@ def build_debug_grid(
     # Panel 2: Canny edge map
     axes[0, 1].imshow(edges, cmap="gray")
     edge_ratio = cv2.countNonZero(edges) / edges.size
-    axes[0, 1].set_title(f"2. Canny Edges\n({cv2.countNonZero(edges)}/{edges.size} px, {edge_ratio:.1%})")
+    axes[0, 1].set_title(
+        f"2. Canny Edges\n({cv2.countNonZero(edges)}/{edges.size} px, {edge_ratio:.1%})"
+    )
     axes[0, 1].axis("off")
 
     # Panel 3: Lines overlay (BGR -> RGB)
@@ -361,15 +363,15 @@ def main():
     )
 
     # --- Terminal summary ---
-    print(f"\n{'='*50}")
-    print(f"  Day 19 Hough Detection — Summary")
-    print(f"{'='*50}")
+    print(f"\n{'=' * 50}")
+    print("  Day 19 Hough Detection — Summary")
+    print(f"{'=' * 50}")
     h, w = image_gray.shape
     print(f"  Image         : {w} × {h}")
     print(f"  Edge ratio    : {edge_ratio:.1%}  ({cv2.countNonZero(edges)}/{edges.size} px)")
     print(f"  Lines detected: {line_count}")
     print(f"  Circles detect: {circle_count}")
-    print(f"{'='*50}")
+    print(f"{'=' * 50}")
     print(f"\nView results in {output_dir}/")
 
 
