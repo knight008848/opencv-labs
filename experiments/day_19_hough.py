@@ -186,7 +186,7 @@ def sweep_line_threshold(
     
 
     plt.tight_layout()
-    fig.savefig(str(output_dir / "day_19_line_sweep.png"), dpi=150, bbox_inches="tight")
+    fig.savefig(str(output_dir / "day_19_line_sweep.png"), dpi=150)
     plt.close(fig)
     print(f"  Saved line sweep: {output_dir / 'day_19_line_sweep.png'}")
 
@@ -221,7 +221,7 @@ def sweep_circle_param2(
 
 
     plt.tight_layout()
-    fig.savefig(str(output_dir / "day_19_circle_sweep.png"), dpi=150, bbox_inches="tight")
+    fig.savefig(str(output_dir / "day_19_circle_sweep.png"), dpi=150)
     plt.close(fig)
     print(f"  Saved circle sweep: {output_dir / 'day_19_circle_sweep.png'}")
 
@@ -279,7 +279,7 @@ def build_debug_grid(
 
     plt.tight_layout()
     path = output_dir / "day_19_debug.png"
-    fig.savefig(str(path), dpi=150, bbox_inches="tight")
+    fig.savefig(str(path), dpi=150)
     plt.close(fig)
     print(f"  Saved debug grid: {path}")
 
