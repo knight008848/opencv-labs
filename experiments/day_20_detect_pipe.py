@@ -17,6 +17,7 @@ from pathlib import Path
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
+from day_17_contours import get_color_palette
 
 # Resolve paths relative to this script's location
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -77,7 +78,6 @@ def to_grayscale(image_bgr: np.ndarray) -> np.ndarray:
 
     HINT: cv2.cvtColor with COLOR_BGR2GRAY.
     """
-    # TODO: implement
     return cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
 
 
@@ -90,7 +90,6 @@ def apply_blur(gray: np.ndarray, ksize: tuple[int, int]) -> np.ndarray:
 
     HINT: cv2.GaussianBlur. ksize must be odd (e.g. (5,5)).
     """
-    # TODO: implement
     return cv2.GaussianBlur(gray, ksize, 0)
 
 
@@ -276,8 +275,32 @@ def draw_annotations(
 
     Returns BGR image ready for imwrite.
     """
-    # TODO: implement
-    pass
+    image = image_bgr.copy()
+    colors = get_color_palette(len(contours))
+
+    for i, c in enumerate(contours):
+        color = colors[i]
+
+        # Draw contour outline
+        cv2.drawContours(image, contours, i, color, thickness=2)
+
+        # Draw axis-aligned bounding box (blue)
+        x, y, w, h = cv2.boundingRect(c)
+        cv2.rectangle(image, (x, y), (x + w, y + h), (255, 0, 0), 2)
+
+        # Label near centroid (already computed in properties[i])
+        cx, cy = properties[i]["cx"], properties[i]["cy"]
+        cv2.putText(
+            image,
+            f"ID:{i} Area:{int(cv2.contourArea(c))} Shape:{shapes[i]}",
+            (cx, cy),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (0, 0, 255),
+            1,
+        )
+
+    return image
 
 
 # ===================  Pipeline Orchestrator  ==================================
@@ -391,8 +414,40 @@ def build_debug_grid(
     HINT: plt.subplots(2, 3). Use cv2.imread to load each step image.
     Convert BGR → RGB before displaying with imshow.
     """
-    # TODO: implement
-    pass
+    step_keys = [
+        "step_01_load", "step_02_gray", "step_03_blur",
+        "step_04_canny", "step_05_morph", "annotated",
+    ]
+    display_names = {
+        "step_01_load": "1. Load",
+        "step_02_gray": "2. Grayscale",
+        "step_03_blur": "3. Gaussian Blur",
+        "step_04_canny": "4. Canny Edges",
+        "step_05_morph": "5. Morph Close",
+        "annotated": "6. Annotated",
+    }
+
+    fig, axes = plt.subplots(2, 3, figsize=(15, 8))
+    fig.suptitle("Detection Pipeline — Intermediate Results", fontsize=14)
+
+    for ax, key in zip(axes.flat, step_keys):
+        path = step_paths.get(key, "")
+        if path and Path(path).exists():
+            img_bgr = cv2.imread(str(path))
+            if len(img_bgr.shape) == 2:
+                ax.imshow(img_bgr, cmap="gray")
+            else:
+                ax.imshow(cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB))
+        else:
+            ax.text(0.5, 0.5, "N/A", ha="center", va="center", transform=ax.transAxes)
+
+        ax.set_title(display_names.get(key, key))
+        ax.axis("off")
+
+    plt.tight_layout()
+    fig.savefig(str(output_path), dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"  Saved debug grid: {output_path}")
 
 
 # =====================  Save JSON Results  ====================================
