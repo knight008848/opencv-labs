@@ -27,20 +27,20 @@ PROJECT_DIR = SCRIPT_DIR.parent
 
 PIPELINE_CONFIG = {
     # Preprocessing
-    "blur_ksize": (5, 5),            # GaussianBlur kernel size (odd, odd)
-    "canny_t1": 50,                   # Canny low threshold
-    "canny_t2": 150,                  # Canny high threshold
+    "blur_ksize": (5, 5),  # GaussianBlur kernel size (odd, odd)
+    "canny_t1": 50,  # Canny low threshold
+    "canny_t2": 150,  # Canny high threshold
     # Morphology
-    "morph_kernel_size": 3,           # kernel size for morphology operations
-    "morph_iterations": 1,            # number of iterations
+    "morph_kernel_size": 3,  # kernel size for morphology operations
+    "morph_iterations": 1,  # number of iterations
     "morph_operation": cv2.MORPH_CLOSE,  # close = dilate then erode (connects gaps)
     # Contour filtering
-    "min_area": 50,                   # discard contours smaller than this (px²)
-    "max_area": 1e6,                  # discard contours larger than this (px²)
+    "min_area": 50,  # discard contours smaller than this (px²)
+    "max_area": 1e6,  # discard contours larger than this (px²)
     # ApproxPolyDP
-    "approx_epsilon_factor": 0.02,    # fraction of arcLength for epsilon
+    "approx_epsilon_factor": 0.02,  # fraction of arcLength for epsilon
     # Image loading
-    "max_size": 1200,                 # downscale longest side to this
+    "max_size": 1200,  # downscale longest side to this
     # Output
     "output_dir": PROJECT_DIR / "data" / "processed" / "day_20",
 }
@@ -148,7 +148,9 @@ def find_contours(
     """
     contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-    filtered = [c for c in contours if cv2.contourArea(c) >= min_area and cv2.contourArea(c) < max_area]
+    filtered = [
+        c for c in contours if cv2.contourArea(c) >= min_area and cv2.contourArea(c) < max_area
+    ]
     return sorted(filtered, key=cv2.contourArea, reverse=True)
 
 
@@ -251,8 +253,6 @@ def classify_shape(cnt: np.ndarray, epsilon_factor: float = 0.02) -> str:
         return "Circle"
     else:
         return "Irregular"
-
-
 
 
 # ===================  Step 8 — Annotate Image  ================================
@@ -432,8 +432,12 @@ def build_debug_grid(
     Convert BGR → RGB before displaying with imshow.
     """
     step_keys = [
-        "step_01_load", "step_02_gray", "step_03_blur",
-        "step_04_canny", "step_05_morph", "annotated",
+        "step_01_load",
+        "step_02_gray",
+        "step_03_blur",
+        "step_04_canny",
+        "step_05_morph",
+        "annotated",
     ]
     display_names = {
         "step_01_load": "1. Load",
@@ -500,9 +504,9 @@ def main():
     # --- Collect test images ---
     raw_dir = PROJECT_DIR / "data" / "raw"
     test_images = [
-        raw_dir / "type_test.png",        # Synthetic: geometric shapes
-        raw_dir / "IMG_0701.png",          # Real: desktop scene 1
-        raw_dir / "IMG_0705.png",          # Real: desktop scene 2
+        raw_dir / "type_test.png",  # Synthetic: geometric shapes
+        raw_dir / "IMG_0701.png",  # Real: desktop scene 1
+        raw_dir / "IMG_0705.png",  # Real: desktop scene 2
     ]
 
     # Verify all files exist
@@ -516,7 +520,7 @@ def main():
         return
 
     print(f"\n{'=' * 55}")
-    print(f"  Day 20 — Object Detection Pipeline")
+    print("  Day 20 — Object Detection Pipeline")
     print(f"  Images to process: {[p.name for p in valid_images]}")
     print(f"{'=' * 55}\n")
 
@@ -544,7 +548,7 @@ def main():
 
     # --- Terminal summary ---
     print(f"{'=' * 55}")
-    print(f"  Day 20 Pipeline — Summary")
+    print("  Day 20 Pipeline — Summary")
     print(f"{'=' * 55}")
     for res in all_results:
         err = res.get("error")
