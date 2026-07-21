@@ -17,7 +17,6 @@ from pathlib import Path
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-from day_17_contours import get_color_palette
 
 # Resolve paths relative to this script's location
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -254,6 +253,23 @@ def classify_shape(cnt: np.ndarray, epsilon_factor: float = 0.02) -> str:
 
 
 # ===================  Step 8 — Annotate Image  ================================
+
+
+def get_color_palette(n: int) -> list[tuple[int, int, int]]:
+    """
+    Return n distinct BGR colors for drawing contours.
+
+    Generates evenly-spaced hues in HSV, converts to BGR.
+    Returns empty list when n == 0.
+    """
+    if n == 0:
+        return []
+    hsv = np.zeros((1, n, 3), dtype=np.uint8)
+    hsv[0, :, 0] = np.linspace(0, 179, n, dtype=np.uint8)
+    hsv[0, :, 1] = 255
+    hsv[0, :, 2] = 255
+    bgr = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+    return [tuple(int(v) for v in c) for c in bgr[0]]
 
 
 def draw_annotations(
