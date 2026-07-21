@@ -103,7 +103,6 @@ def detect_edges(blurred: np.ndarray, low: int, high: int) -> np.ndarray:
     HINT: cv2.Canny.
     low / high are the hysteresis thresholds (low / high).
     """
-    # TODO: implement
     return cv2.Canny(blurred, low, high)
 
 
@@ -145,7 +144,6 @@ def find_contours(
       Filter by min_area < cv2.contourArea(c) < max_area
       Sort descending by area.
     """
-    # TODO: implement
     contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     filtered = [c for c in contours if cv2.contourArea(c) >= min_area and cv2.contourArea(c) < max_area]
@@ -460,7 +458,6 @@ def save_json_report(results: list[dict], output_path: Path) -> None:
     HINT: json.dump(results, f, indent=2, ensure_ascii=False)
     Each result dict has keys: image_name, total_objects, objects[...].
     """
-    # TODO: implement
     with open(output_path, "w") as f:
         json.dump(results, f, indent=2, ensure_ascii=False)
 
