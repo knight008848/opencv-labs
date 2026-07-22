@@ -5,11 +5,11 @@
 ## 当前状态
 
 - **开始日期：** 2026-06-09
-- **当前天数：** Day 19 / 30
-- **当前模块：** 模块 9 概念 A+B — 霍夫直线 + 圆检测（已完结，测验 6/8 75%）
-- **完成率：** 63%
+- **当前天数：** Day 20 / 30
+- **当前模块：** 模块 9 概念 C — Pipeline 设计（7 步检测流水线：load→gray→blur→Canny→morph→contours→analyze）
+- **完成率：** 67%
 - **最终项目：** 具身视觉数据管道（MP4 -> 结构化观察数据）
-- **累计编码时间：** ~23 小时
+- **累计编码时间：** ~25 小时
 
 ---
 
@@ -37,6 +37,7 @@
 | 07-14 | Day 17 | 模块 8 | 1/1 | - | ~1h | 轮廓提取 Pipeline：灰度→Canny→findContours→面积过滤→彩色标注→debug 网格 |
 | 07-16 | Day 18 | 模块 8 | 1/1 | 100% (5/5) | ~1h | 几何属性 + approxPolyDP 形状分类 + CSV 报告 + 模块测验 |
 | 07-17 | Day 19 | 模块 9 | 1/1 | 75% (6/8) | ~1.5h | 霍夫直线/圆检测 + 参数 sweep + 并排对比 + 模块测验 |
+| 07-22 | Day 20 | 模块 9 | 1/1 | - | ~2h | 7 步检测 Pipeline + 视频帧验证 + 中间步骤可视化 + JSON 报告 |
 
 ---
 
@@ -107,6 +108,29 @@
 1. 霍夫直线和轮廓法检测直线的方式有什么不同？轮廓法先找闭合边界再 approxPolyDP 判断边数——前提是直线必须构成封闭图形的边。霍夫直接检测任意方向的非闭合线段——只要边缘点在投票空间中有足够多的共线点。前者"找形状"，后者"找直线"。
 2. threshold 在 Hough 和 Canny 中的含义有何区别？Canny 的 threshold 是梯度强度阈值（滞后连接用的）；Hough 的 threshold 是最少投票数（最少有多少个像素共线才算直线）。同名不同义。
 3. 霍夫检测和最终项目的关系？最终项目的"帧间物体追踪"环节中，如果场景中有直线特征（如桌面边缘、工件边界），霍夫直线可以作为特征点的补充线索——结合轮廓的质心追踪和霍夫的直线追踪提供更鲁棒的帧间对齐。
+
+### Day 20 (2026-07-22) — 模块 9 概念 C：Pipeline 设计
+
+**完成事项：**
+- [x] 7 步检测 Pipeline 骨架：load_image / to_grayscale / apply_blur / detect_edges / morph_close / find_contours / compute_properties + classify_shape
+- [x] draw_annotations：轮廓着色 + 轴对齐包围盒 + 质心标签（ID / 面积 / 形状）
+- [x] get_color_palette：HSV 色相均匀采样 → BGR 元组（内联实现，消除 Day 17 导入依赖）
+- [x] build_debug_grid：2×3 流水线中间结果可视化（Load / Gray / Blur / Canny / Morph / Annotated）
+- [x] run_pipeline：7 步串联 + 异常保护 + steps/ 中间结果分包保存
+- [x] main：合成图 type_test.png + 真实照片 IMG_0701.png / IMG_0705.png 三图验证
+- [x] 视频帧验证：从 rgb_79c1787d6c.mp4 随机抽 4 帧 → 全部跑通（11 / 5 / 112 / 68 / 30 / 38 / 35 物体）
+- [x] save_json_report：多图结果汇总 JSON 输出
+- [x] 空轮廓保护 + FileNotFoundError 升级 + m00=0 除零保护
+
+**关键发现：**
+- 流水线的 7 步顺序有严格依赖：必须先 blur 降噪再 Canny，否则噪声边缘泛滥；必须先 morph 闭合断裂边再 findContours，否则一条轮廓断成好几段
+- 视频帧 (1920×1440 @60fps) 需用 max_size=1200 降采样——全分辨率下轮廓数量陡增但大部分是背景纹理
+- 形状分类基于 approxPolyDP 顶点数：3→Triangle / 4→Rectangle / ≥8→Circle，但真实场景中许多 "Circle" 的 circularity 仅 0.01~0.14——需后续用 circularity 二次校验
+
+**复盘三问：**
+1. Pipeline 的每一步是否可以互换顺序？大部分不行。顺序是：去噪（Blur）→ 边缘（Canny）→ 闭合（Morph）→ 轮廓（Contours）。调换 blur 和 Canny 会多出无数假边缘；去掉 morph 会导致断裂轮廓无法被完整检出。
+2. run_pipeline 的接口设计有什么取舍？每步都保存中间结果到文件——方便调试但增加 I/O。最终项目版应该给一个 debug=False 参数跳过中间保存，只保留最终输出。
+3. 今天 Pipeline 的架构和最终项目的关系？架构完全一致：帧提取 → 预处理 → 特征提取 → 结构化输出。今天用 Canny+Contours 作为"特征"，最终项目替换成 ROI 分窗 + 帧间追踪即可。
 
 ### Day 15 (2026-06-29) — 模块 7 概念 A：三种二值化策略 + BINARY vs BINARY_INV
 
@@ -383,10 +407,10 @@
 ```
 Week 1 图像基石:     7/7 天  ✓
 Week 2 图像变换:     7/7 天  ✓
-Week 3 图像分析:     5/7 天
+Week 3 图像分析:     6/7 天
 Week 4 进阶+项目:    0/9 天  (含 Day 29-30 项目冲刺)
 ----------------------------------------------
-总进度:             19/30 天
+总进度:             20/30 天
 ```
 
 ---
@@ -400,4 +424,4 @@ Week 4 进阶+项目:    0/9 天  (含 Day 29-30 项目冲刺)
 - [x] Day 17: 模块 8 概念 A — 轮廓提取（findContours + drawContours + 层级）
 - [x] Day 18: 模块 8 概念 B+C — 轮廓几何属性 + approxPolyDP 形状分类 + 模块 8 测验
 - [x] Day 19: 模块 9 — Hough 变换（直线检测 + 圆检测）
-- [ ] Day 20: 模块 9 概念 C — Pipeline 设计 + 综合练习
+- [x] Day 20: 模块 9 概念 C — Pipeline 设计 + 综合练习（成功验证 3 张真实图 + 4 个视频帧）
