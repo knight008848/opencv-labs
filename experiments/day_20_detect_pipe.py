@@ -153,7 +153,8 @@ def find_contours(
     # Compute area once per contour (avoid repeated cv2.contourArea calls)
     with_area = [(c, cv2.contourArea(c)) for c in contours]
     filtered = [(c, a) for c, a in with_area if min_area <= a < max_area]
-    filtered.sort(key=lambda x: x[1], reverse=True)
+    # Stable sort: primary=area desc, secondary=point count desc (tie-breaker)
+    filtered.sort(key=lambda x: (x[1], x[0].shape[0]), reverse=True)
     return [c for c, _ in filtered]
 
 
