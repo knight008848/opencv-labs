@@ -461,10 +461,7 @@ def build_debug_grid(
         path = step_paths.get(key)
         if path and path.exists():
             img_bgr = cv2.imread(str(path))
-            if len(img_bgr.shape) == 2:
-                ax.imshow(img_bgr, cmap="gray")
-            else:
-                ax.imshow(cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB))
+            ax.imshow(cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB))
         else:
             ax.text(0.5, 0.5, "N/A", ha="center", va="center", transform=ax.transAxes)
 
