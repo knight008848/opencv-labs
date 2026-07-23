@@ -307,8 +307,13 @@ def draw_annotations(
         # Draw contour outline
         cv2.drawContours(image, contours, i, color, thickness=2)
 
-        # Draw axis-aligned bounding box (blue)
-        x, y, w, h = cv2.boundingRect(c)
+        # Axis-aligned bounding box (from stored properties to avoid recompute)
+        x, y, w, h = (
+            properties[i]["bbox_x"],
+            properties[i]["bbox_y"],
+            properties[i]["bbox_w"],
+            properties[i]["bbox_h"],
+        )
         cv2.rectangle(image, (x, y), (x + w, y + h), (255, 0, 0), 2)
 
         # Label near centroid (use stored float, convert to int for putText)
