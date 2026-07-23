@@ -123,9 +123,6 @@ def morph_close(
     Closing connects nearby white regions — useful for filling small gaps
     in detected edges so contours become complete.
     """
-    if edges is None:
-        return edges
-
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_size, kernel_size))
     return cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel, iterations=iterations)
 
