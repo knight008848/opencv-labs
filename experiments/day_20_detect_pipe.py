@@ -141,6 +141,8 @@ def find_contours(
     """
     Extract external contours from a binary image, sorted by area descending.
 
+    Pre-computes area once per contour to avoid repeated cv2.contourArea calls.
+
     HINT:
       cnts, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
       Filter by min_area < cv2.contourArea(c) < max_area
@@ -148,10 +150,11 @@ def find_contours(
     """
     contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-    filtered = [
-        c for c in contours if cv2.contourArea(c) >= min_area and cv2.contourArea(c) < max_area
-    ]
-    return sorted(filtered, key=cv2.contourArea, reverse=True)
+    # Compute area once per contour (avoid repeated cv2.contourArea calls)
+    with_area = [(c, cv2.contourArea(c)) for c in contours]
+    filtered = [(c, a) for c, a in with_area if min_area <= a < max_area]
+    filtered.sort(key=lambda x: x[1], reverse=True)
+    return [c for c, _ in filtered]
 
 
 # =================  Step 7 — Geometric Analysis  ==============================
@@ -181,19 +184,19 @@ def compute_properties(cnt: np.ndarray) -> dict:
 
     perimeter = cv2.arcLength(cnt, True)
 
-    # - If m00 == 0, set cx/cy = 0 (prevent ZeroDivisionError)
+    # - If m00 == 0, set cx/cy = 0.0 (prevent ZeroDivisionError)
     M = cv2.moments(cnt)
     if M["m00"] == 0:
-        cx, cy = 0, 0
+        cx, cy = 0.0, 0.0
     else:
-        cx = int(M["m10"] / M["m00"])
-        cy = int(M["m01"] / M["m00"])
+        cx = M["m10"] / M["m00"]
+        cy = M["m01"] / M["m00"]
 
     bbox_x, bbox_y, bbox_w, bbox_h = cv2.boundingRect(cnt)
     ((rotated_cx, rotated_cy), (rotated_w, rotated_h), rotated_angle) = cv2.minAreaRect(cnt)
 
-    circularity = 4 * np.pi * area / (perimeter**2)
-    aspect_ratio = rotated_w / rotated_h
+    circularity = 4 * np.pi * area / (perimeter**2) if perimeter > 0 else 0.0
+    aspect_ratio = rotated_w / rotated_h if rotated_h > 0 else 0.0
 
     return {
         "area": area,
@@ -214,40 +217,42 @@ def compute_properties(cnt: np.ndarray) -> dict:
     }
 
 
-def classify_shape(cnt: np.ndarray, epsilon_factor: float = 0.02) -> str:
+def classify_shape(
+    cnt: np.ndarray,
+    epsilon_factor: float = 0.02,
+    perimeter: float | None = None,
+) -> str:
     """
     Classify a contour as 'Triangle', 'Rectangle', 'Circle', or 'Irregular'.
 
     Pipeline:
-        1. perimeter = cv2.arcLength(cnt, True)
-        2. epsilon = 0.02 * perimeter  (starting value — tune if misclassifies)
+        1. perimeter (computed or passed in)
+        2. epsilon = epsilon_factor * perimeter
         3. approx = cv2.approxPolyDP(cnt, epsilon, True)
         4. vertices = len(approx)
         5. Classify:
-             vertices == 3  → "Triangle"
-             vertices == 4  → "Rectangle"
-             vertices >= 8  → "Circle"
-             else           → "Irregular"
+             vertices == 3        → "Triangle"
+             4 <= vertices <= 6   → "Rectangle"
+             vertices >= 8        → "Circle"
+             else                 → "Irregular"
 
     HINT: 0.02 * perimeter is a heuristic. If your objects are very small or
     very noisy, try epsilon = 0.01 * perimeter (stricter = more vertices).
     If a known-rectangle classifies as "Irregular", epsilon is too small.
 
-    HINT: A true rectangle has 4 vertices, but noise may give 5-7.
-    Consider treating 4 <= vertices <= 6 as "Rectangle" for real-world images.
-
     Returns:
         One of: "Triangle", "Rectangle", "Circle", "Irregular"
     """
 
-    perimeter = cv2.arcLength(cnt, True)
+    if perimeter is None:
+        perimeter = cv2.arcLength(cnt, True)
     epsilon = epsilon_factor * perimeter
     approx = cv2.approxPolyDP(cnt, epsilon, True)
     vertices = len(approx)
 
     if vertices == 3:
         return "Triangle"
-    elif vertices == 4:
+    elif 4 <= vertices <= 6:
         return "Rectangle"
     elif vertices >= 8:
         return "Circle"
@@ -305,11 +310,11 @@ def draw_annotations(
         x, y, w, h = cv2.boundingRect(c)
         cv2.rectangle(image, (x, y), (x + w, y + h), (255, 0, 0), 2)
 
-        # Label near centroid (already computed in properties[i])
-        cx, cy = properties[i]["cx"], properties[i]["cy"]
+        # Label near centroid (use stored float, convert to int for putText)
+        cx, cy = int(properties[i]["cx"]), int(properties[i]["cy"])
         cv2.putText(
             image,
-            f"ID:{i} Area:{int(cv2.contourArea(c))} Shape:{shapes[i]}",
+            f"ID:{i} Area:{int(properties[i]['area'])} Shape:{shapes[i]}",
             (cx, cy),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.5,
@@ -333,7 +338,7 @@ def run_pipeline(
     Each step saves its intermediate result to a steps/ subdirectory.
     Returns a result dict containing:
       - "image_name": str
-      - "output_paths": dict of step_name → file path
+      - "output_paths": dict of step_name → Path
       - "objects": list of dicts with properties + shape
       - "total_objects": int
     """
@@ -349,63 +354,66 @@ def run_pipeline(
         "total_objects": 0,
     }
 
+    def _save(img: np.ndarray, label: str) -> np.ndarray:
+        """Save intermediate image and record its path. Returns img for convenience."""
+        path = steps_dir / f"{image_name}_{label}.jpg"
+        cv2.imwrite(str(path), img)
+        result["output_paths"][f"step_{label}"] = path
+        return img
+
     try:
         # ---- Step 1: Load ----
         print(f"  [1/7] Loading {image_path.name}...")
-        img = load_image(image_path, config["max_size"])
-        cv2.imwrite(str(steps_dir / f"{image_name}_01_load.jpg"), img)
-        result["output_paths"]["step_01_load"] = str(steps_dir / f"{image_name}_01_load.jpg")
+        img = _save(load_image(image_path, config["max_size"]), "01_load")
 
         # ---- Step 2: Grayscale ----
         print("  [2/7] Converting to grayscale...")
-        gray = to_grayscale(img)
-        cv2.imwrite(str(steps_dir / f"{image_name}_02_gray.jpg"), gray)
-        result["output_paths"]["step_02_gray"] = str(steps_dir / f"{image_name}_02_gray.jpg")
+        gray = _save(to_grayscale(img), "02_gray")
 
         # ---- Step 3: Blur ----
         print("  [3/7] Applying Gaussian blur...")
-        blurred = apply_blur(gray, config["blur_ksize"])
-        cv2.imwrite(str(steps_dir / f"{image_name}_03_blur.jpg"), blurred)
-        result["output_paths"]["step_03_blur"] = str(steps_dir / f"{image_name}_03_blur.jpg")
+        blurred = _save(apply_blur(gray, config["blur_ksize"]), "03_blur")
 
         # ---- Step 4: Canny ----
         print("  [4/7] Detecting edges...")
-        edges = detect_edges(blurred, config["canny_t1"], config["canny_t2"])
-        cv2.imwrite(str(steps_dir / f"{image_name}_04_canny.jpg"), edges)
-        result["output_paths"]["step_04_canny"] = str(steps_dir / f"{image_name}_04_canny.jpg")
+        edges = _save(detect_edges(blurred, config["canny_t1"], config["canny_t2"]), "04_canny")
 
         # ---- Step 5: Morphology ----
         print("  [5/7] Applying morphology...")
-        closed = morph_close(edges, config["morph_kernel_size"], config["morph_iterations"])
-        cv2.imwrite(str(steps_dir / f"{image_name}_05_morph.jpg"), closed)
-        result["output_paths"]["step_05_morph"] = str(steps_dir / f"{image_name}_05_morph.jpg")
+        closed = _save(
+            morph_close(edges, config["morph_kernel_size"], config["morph_iterations"]),
+            "05_morph",
+        )
 
         # ---- Step 6: Contours ----
         print("  [6/7] Finding contours...")
         contours = find_contours(closed, config["min_area"], config["max_area"])
-        result["total_objects"] = len(contours)
 
         # ---- Step 7: Analyze ----
         print("  [7/7] Analyzing geometry...")
-        properties = []
-        shapes = []
+        properties: list[dict] = []
+        shapes: list[str] = []
         for cnt in contours:
             props = compute_properties(cnt)
-            shape = classify_shape(cnt, config["approx_epsilon_factor"])
+            shape = classify_shape(cnt, config["approx_epsilon_factor"], props["perimeter"])
             props["shape"] = shape
             properties.append(props)
             shapes.append(shape)
             result["objects"].append(props)
 
+        result["total_objects"] = len(result["objects"])
+
         # ---- Draw annotations ----
         annotated = draw_annotations(img, contours, properties, shapes)
-        ann_path = str(output_dir / f"{image_name}_annotated.jpg")
-        cv2.imwrite(ann_path, annotated)
+        ann_path = steps_dir / f"{image_name}_annotated.jpg"
+        cv2.imwrite(str(ann_path), annotated)
         result["output_paths"]["annotated"] = ann_path
 
         print(f"      → {len(contours)} objects detected, annotated saved.")
 
     except Exception as e:
+        if isinstance(e, KeyboardInterrupt):
+            raise
         print(f"  [ERROR] Pipeline failed for {image_name}: {e}")
         result["error"] = str(e)
 
@@ -416,13 +424,11 @@ def run_pipeline(
 
 
 def build_debug_grid(
-    step_paths: dict[str, str],
-    annotated_path: str,
-    objects: list[dict],
+    step_paths: dict[str, Path],
     output_path: Path,
 ) -> None:
     """
-    Create a 2×3 or 3×2 grid showing intermediate pipeline results.
+    Create a 2×3 grid showing intermediate pipeline results.
 
     Panels (in order they appear in the grid):
       Load | Gray  | Blur
@@ -452,8 +458,8 @@ def build_debug_grid(
     fig.suptitle("Detection Pipeline — Intermediate Results", fontsize=14)
 
     for ax, key in zip(axes.flat, step_keys):
-        path = step_paths.get(key, "")
-        if path and Path(path).exists():
+        path = step_paths.get(key)
+        if path and path.exists():
             img_bgr = cv2.imread(str(path))
             if len(img_bgr.shape) == 2:
                 ax.imshow(img_bgr, cmap="gray")
@@ -478,11 +484,16 @@ def save_json_report(results: list[dict], output_path: Path) -> None:
     """
     Write a JSON report containing results for all processed images.
 
-    HINT: json.dump(results, f, indent=2, ensure_ascii=False)
-    Each result dict has keys: image_name, total_objects, objects[...].
+    Converts Path objects in output_paths to strings for JSON serialization.
     """
+    cleaned = []
+    for r in results:
+        entry = dict(r)
+        entry["output_paths"] = {k: str(v) for k, v in r["output_paths"].items()}
+        cleaned.append(entry)
+
     with open(output_path, "w") as f:
-        json.dump(results, f, indent=2, ensure_ascii=False)
+        json.dump(cleaned, f, indent=2, ensure_ascii=False)
 
 
 # ============================  Main  ==========================================
@@ -534,8 +545,6 @@ def main():
         debug_path = output_dir / f"{img_path.stem}_debug.png"
         build_debug_grid(
             result["output_paths"],
-            result["output_paths"].get("annotated", ""),
-            result["objects"],
             debug_path,
         )
 
