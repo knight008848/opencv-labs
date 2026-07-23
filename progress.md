@@ -39,6 +39,7 @@
 | 07-17 | Day 19 | 模块 9 | 1/1 | 75% (6/8) | ~1.5h | 霍夫直线/圆检测 + 参数 sweep + 并排对比 + 模块测验 |
 | 07-22 | Day 20 | 模块 9 | 1/1 | - | ~2h | 7 步检测 Pipeline + 视频帧验证 + 中间步骤可视化 + JSON 报告 |
 | 07-23 | Day 21 | 阶段测试 3 | 1/1 | 95% (19/20) | ~1h | 模块 7-9 综合测试 + 独立 Pipeline 脚本 + 合成图验证 3 种形状 |
+| 07-23 | Day 20 审核 | 代码审核 | 14/14 fix | - | ~1.5h | Day 20 Pipeline 全量 code review + 14 项修复 + 5 个独立 commit |
 
 ---
 
@@ -152,6 +153,33 @@
 1. Otsu 和自适应阈值的本质区别是什么？Otsu 在整个图像直方图上找单一最优阈值（全局），自适应阈值在每像素的局部邻域内分别计算阈值（局部）。光照不均时全局一刀切不可能同时兼顾过亮和过暗的区域。
 2. 实战题为什么要用合成图而不是外部图片？确保零依赖、可重现。考试/面试场景中外部文件可能缺失或路径不对——合成图保证了测试的稳定性。
 3. Week 3 最大的提升是什么？从单一操作（二值化、形态学）到端到端 Pipeline（加载→预处理→检测→分析→输出）的思维转变。三周的模块最终汇聚成一条可运行的检测流水线。
+
+### Day 20 审核 (2026-07-23) — 全量 Code Review + 14 项修复
+
+**完成事项：**
+- [x] 4 个 finder agent 并行扫描（行级、跨文件、复用/效率、海拔/规范）
+- [x] 3 个 verifier agent 逐条验证 14 个候选
+- [x] 首轮 10 项修复（一次 commit）：circularity 除零防护、aspect_ratio 除零防护、Rectangle `==4`→`4<=vertices<=6`、total_objects 后移、KeyboardInterrupt 重抛、`_save` 辅助函数消除重复、contourArea 预计算、centroid 浮点精度、perimeter 参数传递复用、output_paths 改 Path 类型
+- [x] 四小项修复（各一个独立 commit）：删 `len(shape)==2` 死代码分支（cv2.imread 默认始终 3 通道）、加等面积轮廓二级排序键、复用 properties[i] 的 bbox 值替代重复 cv2.boundingRect、删 morph_close 不可达 None 守卫
+- [x] pipeline 跑通 3 张测试图 + JSON 报告正常
+- [x] 作者修正：Vincent → knight008848
+- [x] Push 到 GitHub 成功
+
+**错误分析：**
+- C：`cv2.imread` 默认 `IMREAD_COLOR` 始终返回 3 通道 —— len(shape)==2 分支不可达
+- C：`morph_close` 的 None 守卫在管道内无法触发（Canny 永不返回 None）
+- A：classify_shape 的 Rectangle 判定 `==4` 过严，真实图像的噪点可能产生 5-6 个顶点
+- K：output_paths 存 `str` vs `Path` 混用 —— JSON 序列化时 Path 不可直接 dump
+
+**关键发现：**
+- `cv2.contourArea` 在 filter + sort + compute_properties + draw_annotations 中被调用了 5 次 —— 预计算元组列表可降至 1 次
+- `broad except Exception` 会吞掉 `KeyboardInterrupt`，用户无法 Ctrl+C 中断长 Pipeline
+- `aspect_ratio = rotated_w / rotated_h` 无除零防护，退化轮廓时 crash
+
+**复盘三问：**
+1. 为什么 code review 要找 8 个角度而不是只看代码？单一视角容易漏问题。行级找 crash、跨文件找 drift、效率找浪费、海拔找架构缺陷——覆盖全面才能信任通过的代码。
+2. filter-branch 和 rebase 什么区别？rebase 逐个重放 commit 适合小规模修历史；filter-branch 批处理适合一次改全部 commit 的作者。但两者都重写 hash，push 需要 force。
+3. 今天学到的跟最终项目的关系？代码质量直接决定 Pipeline 在真实视频流上的稳定性。一道除零防护在单张图上无所谓，在 10 万帧视频上就是必现崩溃。
 
 ### Day 15 (2026-06-29) — 模块 7 概念 A：三种二值化策略 + BINARY vs BINARY_INV
 
