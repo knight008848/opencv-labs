@@ -52,7 +52,7 @@ def resize_keep_aspect(
         canvas = np.full((target_size, target_size), pad_color[0], dtype=np.uint8)
     else:
         canvas = np.full((target_size, target_size, 3), pad_color, dtype=np.uint8)
-        
+
     y_offset = (target_size - new_h) // 2
     x_offset = (target_size - new_w) // 2
     canvas[y_offset : y_offset + new_h, x_offset : x_offset + new_w] = resized
