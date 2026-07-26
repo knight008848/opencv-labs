@@ -72,9 +72,10 @@ def test_standardize_for_model():
     expected_red_val = (1.0 - 0.485) / 0.229
     expected_blue_val = (0.0 - 0.406) / 0.225
     
-    # Expected to fail due to BGR vs RGB mismatch
-    assert np.isclose(standardized[0, 0, 2], expected_red_val, atol=1e-2), "Red channel mismatch"
-    assert np.isclose(standardized[0, 0, 0], expected_blue_val, atol=1e-2), "Blue channel mismatch"
+    # standardize_for_model converts the image to RGB format!
+    # So Red is now at index 0, Blue is at index 2
+    assert np.isclose(standardized[0, 0, 0], expected_red_val, atol=1e-2), "Red channel mismatch"
+    assert np.isclose(standardized[0, 0, 2], expected_blue_val, atol=1e-2), "Blue channel mismatch"
 
 def test_draw_labeled_bbox():
     img = np.zeros((100, 100, 3), dtype=np.uint8)

@@ -48,7 +48,11 @@ def resize_keep_aspect(
     new_h, new_w = int(h * scale), int(w * scale)
     resized = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
 
-    canvas = np.full((target_size, target_size, 3), pad_color, dtype=np.uint8)
+    if img.ndim == 2:
+        canvas = np.full((target_size, target_size), pad_color[0], dtype=np.uint8)
+    else:
+        canvas = np.full((target_size, target_size, 3), pad_color, dtype=np.uint8)
+        
     y_offset = (target_size - new_h) // 2
     x_offset = (target_size - new_w) // 2
     canvas[y_offset : y_offset + new_h, x_offset : x_offset + new_w] = resized
@@ -62,6 +66,8 @@ def standardize_for_model(
     std: Tuple[float, ...] = (0.229, 0.224, 0.225),
 ) -> np.ndarray:
     """Standardize an RGB image for model input (ImageNet stats)."""
+    if img.ndim == 3 and img.shape[2] == 3:
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     img = img.astype(np.float32) / 255.0
     img = (img - np.array(mean)) / np.array(std)
     return img
@@ -98,6 +104,10 @@ def create_comparison_grid(
     for i, (img, label) in enumerate(zip(images, labels)):
         r, c = divmod(i, cols)
         y, x = r * cell_size[1], c * cell_size[0]
+
+        # Convert grayscale to BGR so it fits in the 3-channel grid
+        if img.ndim == 2:
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
 
         # Resize image to fit cell
         resized = cv2.resize(img, (cell_size[0] - 10, cell_size[1] - 30))
