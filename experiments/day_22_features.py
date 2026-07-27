@@ -158,10 +158,30 @@ def build_comparison_panel(
       Title each column with nfeatures value and keypoint count
     """
     # TODO: implement
-    pass
+    n = len(results)
+    fig, axes = plt.subplots(2, n, figsize=(5 * n, 8))
+    if n == 1:
+        axes = axes.reshape(2, 1)
 
+    for i, res in enumerate(results):
+        nf = res["nfeatures"]
+        kps = res["keypoints"]
 
-# ──────────────────── 5. Terminal Report ────────────────────────
+        # Row 0: rich keypoints
+        viz = draw_rich_keypoints(gray, kps)
+        axes[0, i].imshow(viz, cmap="gray")
+        axes[0, i].set_title(f"nfeatures={nf}  (found {len(kps)})")
+        axes[0, i].axis("off")
+
+        # Row 1: density heatmap
+        heat = draw_density_heatmap(gray, res["density"])
+        axes[1, i].imshow(cv2.cvtColor(heat, cv2.COLOR_BGR2RGB))
+        axes[1, i].set_title(f"Density {HGRID}x{WGRID}")
+        axes[1, i].axis("off")
+
+    plt.tight_layout()
+    fig.savefig(str(output_path), dpi=150, bbox_inches="tight")
+    plt.close(fig)
 
 
 def print_summary(nfeatures: int, keypoints: list[cv2.KeyPoint]) -> None:
@@ -175,7 +195,10 @@ def print_summary(nfeatures: int, keypoints: list[cv2.KeyPoint]) -> None:
             f"avg response={np.mean(responses):.2f}, avg size={np.mean(sizes):.1f}")
     """
     # TODO: implement
-    pass
+    responses = [kp.response for kp in keypoints]
+    sizes = [kp.size for kp in keypoints]
+    print(f"  nfeatures={nfeatures:5d} → found {len(keypoints):5d} pts, "
+          f"avg response={np.mean(responses):.2f}, avg size={np.mean(sizes):.1f}")
 
 
 def answer_question(nfeatures_results: list[dict]) -> str:
@@ -188,7 +211,25 @@ def answer_question(nfeatures_results: list[dict]) -> str:
       Write 2-3 sentences explaining the trade-off.
     """
     # TODO: implement
-    pass
+    # Compute avg response for each nfeatures setting
+    lines = []
+    for res in nfeatures_results:
+        nf = res["nfeatures"]
+        kps = res["keypoints"]
+        if len(kps) == 0:
+            continue
+        avg_resp = np.mean([kp.response for kp in kps])
+        lines.append(f"    nfeatures={nf:5d} → avg response={avg_resp:.2f}")
+
+    # Build answer based on trend
+    msg = ("More features is NOT always better. "
+           "When nfeatures is small, ORB selects only the strongest corners "
+           "(highest response). As nfeatures grows, the extra keypoints "
+           "have progressively lower response values, meaning they are less "
+           "distinctive and more likely to cause false matches in the "
+           "matching stage. The trade-off: enough features for robust matching "
+           "vs. too many weak features that add noise.")
+    return "\n".join(lines) + "\n\n" + msg
 
 
 # ──────────────────────────── Main ──────────────────────────────
