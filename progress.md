@@ -5,11 +5,11 @@
 ## 当前状态
 
 - **开始日期：** 2026-06-09
-- **当前天数：** Day 21 / 30
-- **当前模块：** 阶段测试 3 — Week 3 综合（模块 7-9）— 95/100 分
-- **完成率：** 70%
+- **当前天数：** Day 22 / 30
+- **当前模块：** 模块 10 概念 A — ORB 特征检测 + 密度热力图 + nfeatures 对比分析
+- **完成率：** 73%
 - **最终项目：** 具身视觉数据管道（MP4 -> 结构化观察数据）
-- **累计编码时间：** ~26 小时
+- **累计编码时间：** ~27 小时
 
 ---
 
@@ -40,6 +40,7 @@
 | 07-22 | Day 20 | 模块 9 | 1/1 | - | ~2h | 7 步检测 Pipeline + 视频帧验证 + 中间步骤可视化 + JSON 报告 |
 | 07-23 | Day 21 | 阶段测试 3 | 1/1 | 95% (19/20) | ~1h | 模块 7-9 综合测试 + 独立 Pipeline 脚本 + 合成图验证 3 种形状 |
 | 07-23 | Day 20 审核 | 代码审核 | 14/14 fix | - | ~1.5h | Day 20 Pipeline 全量 code review + 14 项修复 + 5 个独立 commit |
+| 07-27 | Day 22 | 模块 10 | 1/1 | - | ~1.5h | ORB 特征检测 + 密度热力图 + nfeatures 三组对比 + 合成图跑通 |
 
 ---
 
@@ -180,6 +181,32 @@
 1. 为什么 code review 要找 8 个角度而不是只看代码？单一视角容易漏问题。行级找 crash、跨文件找 drift、效率找浪费、海拔找架构缺陷——覆盖全面才能信任通过的代码。
 2. filter-branch 和 rebase 什么区别？rebase 逐个重放 commit 适合小规模修历史；filter-branch 批处理适合一次改全部 commit 的作者。但两者都重写 hash，push 需要 force。
 3. 今天学到的跟最终项目的关系？代码质量直接决定 Pipeline 在真实视频流上的稳定性。一道除零防护在单张图上无所谓，在 10 万帧视频上就是必现崩溃。
+
+### Day 22 (2026-07-27) — 模块 10 概念 A：ORB 特征检测
+
+**完成事项：**
+- [x] 费曼拆解：特征点（Keypoint）= 图中"有辨识度"的位置，描述子（Descriptor）= 该位置的 256-bit 数字指纹
+- [x] make_synthetic_texture：棋盘格 + 三个几何形状（矩形/圆形/三角形）的灰度合成图
+- [x] detect_keypoints：ORB_create → detectAndCompute 完整管线
+- [x] draw_rich_keypoints：DRAW_RICH_KEYPOINTS 标志显示方向和大小
+- [x] compute_density_map：8×8 网格逐格统计特征点密度
+- [x] draw_density_heatmap：COLORMAP_JET 归一化 → addWeighted 叠加原图
+- [x] build_comparison_panel：2×3 对比图（上行 Rich Keypoints / 下行密度热力图）
+- [x] print_summary：三组 nfeatures 的检出数 / avg response / avg size 终端输出
+- [x] answer_question：分析"特征点越多越好吗？"——基于 avg response 趋势给出 trade-off 结论
+- [x] 合成图跑通：nfeatures=100→81pts / 500→373pts / 2000→986pts
+- [x] 对比图保存至 data/processed/day_22_orb_comparison.png
+
+**关键发现：**
+- 合成图（棋盘格 40px/block）上 ORB 的角点集中在棋盘格交点和形状边缘——纯色区域无特征
+- nfeatures=100 只检出 81 个点（上限没到，说明合成图上的强角点有限）
+- nfeatures=2000 检出 986 个点后 avg size 从 60.5→70.8（尺度假性增大，覆盖更多弱纹理区域）
+- 从像素操作到语义理解的跨越：ORB 让程序能"认出"跨图的同一位置——这是帧间追踪的基础
+
+**复盘三问：**
+1. 特征点和之前学的轮廓（findContours）有什么本质不同？轮廓是"物体边界上的连续点集"（几何形状），特征点是"局部纹理独特的离散位置"（语义地标）。轮廓描述"形状"，特征点描述"身份"。
+2. 为什么 ORB 比 SIFT 更适合入门学习？ORB 免费开源、速度快（二进制描述子+汉明距离）、API 简洁（一行 detectAndCompute）。SIFT 有专利限制且计算量大，对 30 天课程来说工程代价过高。
+3. 特征检测和最终项目的关系？最终项目的"帧间物体追踪"核心就是：第 N 帧检测特征点 → 第 N+1 帧匹配特征点 → 计算物体偏移量。今天学的 ORB 是追踪引擎的"传感器"。
 
 ### Day 15 (2026-06-29) — 模块 7 概念 A：三种二值化策略 + BINARY vs BINARY_INV
 
@@ -460,9 +487,9 @@
 Week 1 图像基石:     7/7 天  ✓
 Week 2 图像变换:     7/7 天  ✓
 Week 3 图像分析:     7/7 天  ✓
-Week 4 进阶+项目:    0/9 天  (含 Day 29-30 项目冲刺)
+Week 4 进阶+项目:    1/9 天  (含 Day 29-30 项目冲刺)
 ----------------------------------------------
-总进度:             21/30 天
+总进度:             22/30 天
 ```
 
 ---
@@ -478,4 +505,5 @@ Week 4 进阶+项目:    0/9 天  (含 Day 29-30 项目冲刺)
 - [x] Day 19: 模块 9 — Hough 变换（直线检测 + 圆检测）
 - [x] Day 20: 模块 9 概念 C — Pipeline 设计 + 综合练习（成功验证 3 张真实图 + 4 个视频帧）
 - [x] **Day 21: 阶段测试 3 — 95/100 分**（Q1 [K] Otsu vs 自适应阈值场景混淆）
-- [ ] Day 22: 模块 10 概念 A+B — ORB 特征检测 + BFMatcher + Ratio Test
+- [x] Day 22: 模块 10 概念 A — ORB 特征检测 + 密度热力图 + nfeatures 对比分析
+- [ ] Day 23: 模块 10 概念 B+C — 特征匹配 + BFMatcher + Ratio Test + RANSAC
