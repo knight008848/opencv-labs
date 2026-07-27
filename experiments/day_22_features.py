@@ -135,6 +135,7 @@ def draw_density_heatmap(
     # TODO: implement
     density = (255 * density / np.max(density)).astype(np.uint8)
     density = cv2.applyColorMap(density, cv2.COLORMAP_JET)
+    gray = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
     return cv2.addWeighted(gray, 0.5, density.astype(np.uint8), 0.5, 0)
 
 
