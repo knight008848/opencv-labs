@@ -40,10 +40,10 @@ def make_synthetic_texture(w: int = CANVAS_W, h: int = CANVAS_H) -> np.ndarray:
     checkerboard = checkerboard.astype(np.uint8) * 255
 
     # Add geometric shapes for extra corner features
-    cv2.rectangle(checkerboard, (50, 50), (150, 150), 128, -1)       # gray rect
-    cv2.circle(checkerboard, (400, 200), 60, 64, -1)                 # dark circle
+    cv2.rectangle(checkerboard, (50, 50), (150, 150), 128, -1)  # gray rect
+    cv2.circle(checkerboard, (400, 200), 60, 64, -1)  # dark circle
     pts = np.array([[500, 350], [420, 250], [580, 250]], dtype=np.int32)
-    cv2.fillPoly(checkerboard, [pts], 192)                           # light triangle
+    cv2.fillPoly(checkerboard, [pts], 192)  # light triangle
 
     return checkerboard.astype(np.uint8)
 
@@ -72,8 +72,9 @@ def draw_rich_keypoints(
     """
     Draw keypoints with circles showing orientation and scale.
     """
-    return cv2.drawKeypoints(gray, keypoints, None,
-                                flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+    return cv2.drawKeypoints(
+        gray, keypoints, None, flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS
+    )
 
 
 def compute_density_map(
@@ -104,8 +105,10 @@ def draw_density_heatmap(
     """
     density = (255 * density / np.max(density)).astype(np.uint8)
     density = cv2.applyColorMap(density, cv2.COLORMAP_JET)
+    # Upscale density grid to match original image dimensions
+    density = cv2.resize(density, (gray.shape[1], gray.shape[0]), interpolation=cv2.INTER_NEAREST)
     gray = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
-    return cv2.addWeighted(gray, 0.5, density.astype(np.uint8), 0.5, 0)
+    return cv2.addWeighted(gray, 0.5, density, 0.5, 0)
 
 
 # ──────────────────── 4. Comparison Panel ───────────────────────
@@ -151,8 +154,10 @@ def print_summary(nfeatures: int, keypoints: list[cv2.KeyPoint]) -> None:
     """
     responses = [kp.response for kp in keypoints]
     sizes = [kp.size for kp in keypoints]
-    print(f"  nfeatures={nfeatures:5d} → found {len(keypoints):5d} pts, "
-          f"avg response={np.mean(responses):.2f}, avg size={np.mean(sizes):.1f}")
+    print(
+        f"  nfeatures={nfeatures:5d} → found {len(keypoints):5d} pts, "
+        f"avg response={np.mean(responses):.2f}, avg size={np.mean(sizes):.1f}"
+    )
 
 
 def answer_question(nfeatures_results: list[dict]) -> str:
@@ -170,13 +175,15 @@ def answer_question(nfeatures_results: list[dict]) -> str:
         lines.append(f"    nfeatures={nf:5d} → avg response={avg_resp:.2f}")
 
     # Build answer based on trend
-    msg = ("More features is NOT always better. "
-           "When nfeatures is small, ORB selects only the strongest corners "
-           "(highest response). As nfeatures grows, the extra keypoints "
-           "have progressively lower response values, meaning they are less "
-           "distinctive and more likely to cause false matches in the "
-           "matching stage. The trade-off: enough features for robust matching "
-           "vs. too many weak features that add noise.")
+    msg = (
+        "More features is NOT always better. "
+        "When nfeatures is small, ORB selects only the strongest corners "
+        "(highest response). As nfeatures grows, the extra keypoints "
+        "have progressively lower response values, meaning they are less "
+        "distinctive and more likely to cause false matches in the "
+        "matching stage. The trade-off: enough features for robust matching "
+        "vs. too many weak features that add noise."
+    )
     return "\n".join(lines) + "\n\n" + msg
 
 
@@ -210,12 +217,14 @@ def main() -> None:
         for nf in NCOMPARE_VALUES:
             kps, desc = detect_keypoints(gray, nfeatures=nf)
             density = compute_density_map(gray, kps)
-            results.append({
-                "nfeatures": nf,
-                "keypoints": kps,
-                "descriptors": desc,
-                "density": density,
-            })
+            results.append(
+                {
+                    "nfeatures": nf,
+                    "keypoints": kps,
+                    "descriptors": desc,
+                    "density": density,
+                }
+            )
             print_summary(nf, kps)
 
         # Step 4: Build comparison panel
