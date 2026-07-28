@@ -5,11 +5,11 @@
 ## 当前状态
 
 - **开始日期：** 2026-06-09
-- **当前天数：** Day 22 / 30
-- **当前模块：** 模块 10 概念 A — ORB 特征检测 + 密度热力图 + nfeatures 对比分析
-- **完成率：** 73%
+- **当前天数：** Day 23 / 30
+- **当前模块：** 模块 10 — ORB 特征检测 + 特征匹配 + Ratio Test + RANSAC 物体定位
+- **完成率：** 77%
 - **最终项目：** 具身视觉数据管道（MP4 -> 结构化观察数据）
-- **累计编码时间：** ~27 小时
+- **累计编码时间：** ~28.5 小时
 
 ---
 
@@ -41,6 +41,7 @@
 | 07-23 | Day 21 | 阶段测试 3 | 1/1 | 95% (19/20) | ~1h | 模块 7-9 综合测试 + 独立 Pipeline 脚本 + 合成图验证 3 种形状 |
 | 07-23 | Day 20 审核 | 代码审核 | 14/14 fix | - | ~1.5h | Day 20 Pipeline 全量 code review + 14 项修复 + 5 个独立 commit |
 | 07-27 | Day 22 | 模块 10 | 1/1 | - | ~1.5h | ORB 特征检测 + 密度热力图 + nfeatures 三组对比 + 合成图跑通 |
+| 07-28 | Day 23 | 模块 10 | 1/1 | 80% (4/5) | ~1.5h | 三步匹配管道（原始→Ratio Test→RANSAC）+ 合成图绿色框标注 + 2×2 对比图 + 内点率 17.4% |
 
 ---
 
@@ -207,6 +208,36 @@
 1. 特征点和之前学的轮廓（findContours）有什么本质不同？轮廓是"物体边界上的连续点集"（几何形状），特征点是"局部纹理独特的离散位置"（语义地标）。轮廓描述"形状"，特征点描述"身份"。
 2. 为什么 ORB 比 SIFT 更适合入门学习？ORB 免费开源、速度快（二进制描述子+汉明距离）、API 简洁（一行 detectAndCompute）。SIFT 有专利限制且计算量大，对 30 天课程来说工程代价过高。
 3. 特征检测和最终项目的关系？最终项目的"帧间物体追踪"核心就是：第 N 帧检测特征点 → 第 N+1 帧匹配特征点 → 计算物体偏移量。今天学的 ORB 是追踪引擎的"传感器"。
+
+### Day 23 (2026-07-28) — 模块 10 概念 B+C：ORB 特征匹配 + Ratio Test + RANSAC
+
+**完成事项：**
+- [x] 费曼拆解：Ratio Test = "最像 vs 次像差距大才保留"，RANSAC = "少数服从多数"筛误匹配
+- [x] make_template：复用 generate_texture_image(300,300) 生成模板图
+- [x] make_scene：generate_texture_image(900,600) 背景 + 随机偏移旋转 (0-45°) 嵌入模板，np.where 掩码叠加
+- [x] detect_keypoints：Day 22 函数直接复用
+- [x] match_raw：BFMatcher.match → sorted by distance
+- [x] match_ratio_test：BFMatcher.knnMatch(k=2) → m.distance < 0.75 * n.distance
+- [x] match_ransac：findHomography(RANSAC) → inlier_mask → inlier_ratio
+- [x] draw_keypoints_side_by_side：np.hstack 拼接两张 Rich Keypoints 图
+- [x] draw_matches：cv2.drawMatches 连线可视化
+- [x] draw_object_box：cv2.perspectiveTransform 投影四角 → polylines 绿框 / MATCH FAILED 保护
+- [x] build_comparison_panel：2×2 四阶段对比图（KP / Raw / Ratio / RANSAC）
+- [x] print_match_summary：三步过滤数 + Inlier Ratio + Confidence 四级判定
+- [x] 重构：make_template/make_scene 改用 generate_texture_image 消除重复代码
+- [x] Git push 完成
+
+**关键发现：**
+- 合成图匹配结果：Raw=198 → Ratio=23 → RANSAC=4 (17.4% inlier) → Low confidence
+- Ratio Test 保留率仅 11.6%——棋盘格纹理高度重复，BFMatcher 无法区分"哪个角点匹配哪个角点"
+- 4 个内点刚好画出绿色框，但内点率 17.4% 低于模块验收标准的 20%
+- 根因分析：生成式纹理（棋盘格）的特征点彼此相似，不像真实物体（书封面/logo）有独一无二的纹理
+- np.where(mask, tpl, roi) 替代 cv2.addWeighted + 布尔索引，兼容 NumPy 2
+
+**复盘三问：**
+1. Ratio Test 的 0.75 这个值怎么来的？Lowe 在 SIFT 论文中提出的经验值。0.75 意味着最近邻距离必须比次近邻小 25% 以上才可信。棋盘格角点的最近邻和次近邻距离几乎相等（因为角点都长得像），所以大量被筛掉。
+2. RANSAC 为什么需要至少 4 对点？单应矩阵 H 是 3×3 有 8 个自由度（右下角归一化为 1），每对点提供 2 个方程（x 和 y），4×2=8 刚好够解。3 对点只有 6 个方程，欠定。
+3. 特征匹配和最终项目的关系？帧间追踪的核心就是跨帧匹配——当前帧的特征点去下一帧找匹配。今天的实验是单次匹配，项目需要变成循环匹配（每帧匹配上一帧）。内点率 17.4% 在真实场景中会高很多，因为真实物体纹理独一无二。
 
 ### Day 15 (2026-06-29) — 模块 7 概念 A：三种二值化策略 + BINARY vs BINARY_INV
 
@@ -410,6 +441,8 @@
 | 06-24 | 测试 2 | Q7 | Canny（边缘检测器）| 双边滤波（边缘保留去噪）| [K] | Canny 找边缘，双边滤波保护边缘 | - |
 | 07-17 | 模块 9 | Q2 | "threshold 越大直线越直" | threshold 越大直线越少 | [K] | Hough threshold 是最少投票数，越大=越严格，通过的直线越少 | - |
 | 07-23 | 测试 3 | Q1 | Otsu 适合光照不均 | 自适应阈值适合光照不均 | [K] | Otsu 是全局自动阈值，自适应才是局部阈值——光照不均需要局部处理 | - |
+| 07-28 | 模块 10 | Q2 | FAST + BRIEF | Oriented FAST + Rotated BRIEF | [E] | 缺了 Oriented（旋转不变）和 Rotated（描述子旋转补偿）两个关键修饰词 | - |
+| 07-28 | 模块 10 | Q5 | 仅说汉明距离更快 | ORB 免费开源 vs SIFT 有专利限制 | [K] | 只答了性能对比，漏了专利/开源这个商业/工程上的核心区别 | - |
 
 ---
 
@@ -450,6 +483,7 @@
 | 模块 7 | Day 15-16 | 90% (4.5/5) | 二值化在 Pipeline 中的位置 [A] |
 | 模块 8 | Day 17-18 | 100% (5/5) | — |
 | 模块 9 | Day 19 | 75% (6/8) | Hough threshold 含义混淆 [K] |
+| 模块 10 | Day 22-23 | 80% (4/5) | ORB 全称缺 "Oriented" 和 "Rotated" [E], SIFT vs ORB 漏专利区别 [K] |
 
 ---
 
@@ -487,9 +521,9 @@
 Week 1 图像基石:     7/7 天  ✓
 Week 2 图像变换:     7/7 天  ✓
 Week 3 图像分析:     7/7 天  ✓
-Week 4 进阶+项目:    1/9 天  (含 Day 29-30 项目冲刺)
+Week 4 进阶+项目:    2/9 天  (含 Day 29-30 项目冲刺)
 ----------------------------------------------
-总进度:             22/30 天
+总进度:             23/30 天
 ```
 
 ---
@@ -506,4 +540,12 @@ Week 4 进阶+项目:    1/9 天  (含 Day 29-30 项目冲刺)
 - [x] Day 20: 模块 9 概念 C — Pipeline 设计 + 综合练习（成功验证 3 张真实图 + 4 个视频帧）
 - [x] **Day 21: 阶段测试 3 — 95/100 分**（Q1 [K] Otsu vs 自适应阈值场景混淆）
 - [x] Day 22: 模块 10 概念 A — ORB 特征检测 + 密度热力图 + nfeatures 对比分析
-- [ ] Day 23: 模块 10 概念 B+C — 特征匹配 + BFMatcher + Ratio Test + RANSAC
+- [x] Day 23: 模块 10 概念 B+C — 特征匹配 + BFMatcher + Ratio Test + RANSAC + 合成图定位
+- [x] **模块 10 测验 — 80% (4/5)**（Q2 ORB 全称缺 Oriented/Rotated [E]；Q5 漏 SIFT 专利区别 [K]）
+- [ ] Day 24: 模块 11 概念 A — 视频 I/O（VideoCapture / VideoWriter / 帧提取 + 属性）
+- [ ] Day 25: 模块 11 概念 B — 帧差法运动检测 + 背景减除
+- [ ] Day 26: 模块 12 概念 A+B — 多 ROI 分析 + 数据打包
+- [ ] Day 27: 数据管道 v0.1 — 帧提取 → ROI 分窗 → 特征提取 → JSON/NPZ 输出
+- [ ] Day 28: 阶段测试 4（模块 10-12 综合）+ 项目框架搭建
+- [ ] Day 29: 项目冲刺 — 全流程整合 + 真实视频验证
+- [ ] Day 30: 项目完善 + 演示视频录制
