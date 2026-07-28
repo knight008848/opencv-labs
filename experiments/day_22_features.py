@@ -3,16 +3,25 @@ Day 22 / 2026-07-23 / Module 10: Feature Detection (ORB)
 File: day_22_features.py
 Goal: ORB keypoint analysis on a synthetic textured image —
       detect, visualize, density heatmap, and compare nfeatures settings.
-No external file dependencies (uses synthetic checkerboard).
+Uses generate_texture_image from src.utils and saves a reference copy
+to data/processed/ for Day 23 to reuse.
 Deliverable: 3 visualization panels + terminal summary
 Runtime: ~30 sec
 """
 
+import sys
 from pathlib import Path
 
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
+
+# Ensure project root is on sys.path so src/ imports resolve
+_project_root = Path(__file__).resolve().parent.parent
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
+from src.utils import generate_texture_image  # noqa: E402
 
 # Resolve paths
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -24,28 +33,19 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 NCOMPARE_VALUES = [100, 500, 2000]  # nfeatures values to compare
 HGRID, WGRID = 8, 8  # density heatmap grid divisions
-CANVAS_W, CANVAS_H = 600, 400
 
 
-# ──────────────────────── 1. Synthetic Image ────────────────────
+# ──────────────────── 1. Texture Image ───────────────────────────
+# generate_texture_image() is imported from src.utils. It creates
+# a checkerboard + shapes image. We also save a reference copy for
+# Day 23 to reuse for feature matching.
 
 
-def make_synthetic_texture(w: int = CANVAS_W, h: int = CANVAS_H) -> np.ndarray:
-    """
-    Create a grayscale image with checkerboard + shapes for rich ORB features.
-    """
-    block_size = 40
-    rows, cols = np.indices((h, w))
-    checkerboard = ((rows // block_size) % 2) ^ ((cols // block_size) % 2)
-    checkerboard = checkerboard.astype(np.uint8) * 255
-
-    # Add geometric shapes for extra corner features
-    cv2.rectangle(checkerboard, (50, 50), (150, 150), 128, -1)  # gray rect
-    cv2.circle(checkerboard, (400, 200), 60, 64, -1)  # dark circle
-    pts = np.array([[500, 350], [420, 250], [580, 250]], dtype=np.int32)
-    cv2.fillPoly(checkerboard, [pts], 192)  # light triangle
-
-    return checkerboard.astype(np.uint8)
+def save_reference_texture(output_dir: Path, gray: np.ndarray) -> Path:
+    """Save the generated texture to disk for Day 23 and visual reference."""
+    path = output_dir / "synthetic_texture.png"
+    cv2.imwrite(str(path), gray)
+    return path
 
 
 # ──────────────────── 2. ORB Detection ──────────────────────────
@@ -193,7 +193,7 @@ def answer_question(nfeatures_results: list[dict]) -> str:
 def main() -> None:
     """
     Pipeline:
-      1. Generate synthetic textured image
+      1. Generate synthetic textured image + save reference copy
       2. Detect ORB keypoints with nfeatures=100, 500, 2000
       3. Print summary for each setting
       4. Build 2×3 comparison panel (rich keypoints + density heatmaps)
@@ -206,10 +206,14 @@ def main() -> None:
     try:
         # Step 1: Generate synthetic texture
         print("\n[1/5] Generating synthetic textured image...")
-        gray = make_synthetic_texture()
+        gray = generate_texture_image()
         if gray is None:
             raise RuntimeError("Failed to generate synthetic image")
         print(f"       Image: {gray.shape[1]}×{gray.shape[0]}")
+
+        # Save reference copy for Day 23
+        ref_path = save_reference_texture(OUTPUT_DIR, gray)
+        print(f"       Saved reference: {ref_path.name}")
 
         # Step 2-3: Detect keypoints at different nfeatures settings
         print("\n[2/5] Detecting ORB keypoints...")
