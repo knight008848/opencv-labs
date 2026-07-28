@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 
 import cv2
+import matplotlib.pyplot as plt
 import numpy as np
 
 # Ensure project root is on sys.path so src/ imports resolve
@@ -129,7 +130,10 @@ def match_raw(desc1: np.ndarray, desc2: np.ndarray) -> list[cv2.DMatch]:
         sorted list of DMatch objects
     """
     # ── Your implementation here ──
-    pass  # TODO
+    bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+    matches = bf.match(desc1, desc2)
+    matches.sort(key=lambda x: x.distance)
+    return matches
 
 
 def match_ratio_test(
@@ -147,7 +151,10 @@ def match_ratio_test(
         list of DMatch objects that passed Ratio Test
     """
     # ── Your implementation here ──
-    pass  # TODO
+    bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+    matches = bf.knnMatch(desc1, desc2, k=2)
+    good_matches = [m for m, n in matches if m.distance < ratio * n.distance]
+    return good_matches
 
 
 def match_ransac(
@@ -178,7 +185,14 @@ def match_ransac(
     """
     # ── Your implementation here ──
     # Edge case: if len(good_matches) < 4, RANSAC can't work → return (None, [], 0.0)
-    pass  # TODO
+    src_pts = np.float32([kp1[m.queryIdx].pt for m in good_matches])
+    dst_pts = np.float32([kp2[m.trainIdx].pt for m in good_matches])
+
+    H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, reproj_thresh, confidence)
+    inlier_mask = mask.ravel().astype(bool)
+    inlier_matches = [m for i, m in enumerate(good_matches) if inlier_mask[i]]
+    inlier_ratio = len(inlier_matches) / len(good_matches)
+    return H, inlier_matches, inlier_ratio
 
 
 # ──────────────────── 4. Draw Helpers ──────────────────────────
@@ -193,7 +207,13 @@ def draw_keypoints_side_by_side(
     Stack horizontally with np.hstack.
     """
     # ── Your implementation here ──
-    pass  # TODO
+    img1_keypoints = cv2.drawKeypoints(
+        img1, kp1, None, flags=cv2.DrawKeypointsFlags_DRAW_RICH_KEYPOINTS
+    )
+    img2_keypoints = cv2.drawKeypoints(
+        img2, kp2, None, flags=cv2.DrawKeypointsFlags_DRAW_RICH_KEYPOINTS
+    )
+    return np.hstack([img1_keypoints, img2_keypoints])
 
 
 def draw_matches(
@@ -214,7 +234,15 @@ def draw_matches(
         image with match lines drawn
     """
     # ── Your implementation here ──
-    pass  # TODO
+    return cv2.drawMatches(
+        img1,
+        kp1,
+        img2,
+        kp2,
+        matches[:max_matches],
+        None,
+        flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS,
+    )
 
 
 def draw_object_box(scene: np.ndarray, template_shape: tuple, H: np.ndarray | None) -> np.ndarray:
@@ -239,11 +267,19 @@ def draw_object_box(scene: np.ndarray, template_shape: tuple, H: np.ndarray | No
     """
     # ── Your implementation here ──
     # Note: Convert grayscale to BGR first for colored annotations.
-    pass  # TODO
+    if H is None:
+        scene = cv2.putText(
+            scene, "MATCH FAILED", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2
+        )
+        return scene
+    w, h = template_shape
+    corners = np.float32([[0, 0], [w, 0], [w, h], [0, h]]).reshape(-1, 1, 2)
+    projected_corners = cv2.perspectiveTransform(corners, H)
+    scene = cv2.polylines(scene, [projected_corners], True, (0, 255, 0), 3)
+    return scene
 
 
 # ──────────────────── 5. Comparison Panel ──────────────────────
-# TODO: Arrange all outputs into a clear 2×2 grid.
 
 
 def build_comparison_panel(
@@ -261,23 +297,40 @@ def build_comparison_panel(
     """
     Create a 2×2 grid showing the four stages of matching:
 
-    Top-left:     Side-by-side keypoints
-    Top-right:    Raw matches (first 50)
-    Bottom-left:  Ratio Test matches
-    Bottom-right: RANSAC inliers + green box annotation
+        Top-left:     Side-by-side keypoints
+        Top-right:    Raw matches (first 50)
+        Bottom-left:  Ratio Test matches
+        Bottom-right: RANSAC inliers + green box annotation
 
     Each subplot title includes match count. Bottom-right title
     also includes inlier_ratio.
     """
-    # ── Your implementation here ──
-    # Hint: plt.subplots(2, 2, figsize=(12, 10))
-    #       For each axis: axis.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-    #                      axis.set_title(...)
-    #                      axis.axis("off")
-    #
-    #       Save with: fig.savefig(str(output_path), dpi=150, bbox_inches="tight")
-    #                  plt.close(fig)
-    pass  # TODO
+    # Build the three composite images from draw helpers
+    kp_vis = draw_keypoints_side_by_side(img1, kp1, img2, kp2)
+    raw_vis = draw_matches(img1, kp1, img2, kp2, raw_matches)
+    ratio_vis = draw_matches(img1, kp1, img2, kp2, ratio_matches)
+
+    titles = [
+        f"Keypoints (template: {len(kp1)}, scene: {len(kp2)})",
+        f"Raw Matches: {len(raw_matches)}",
+        f"Ratio Test Matches: {len(ratio_matches)}",
+        f"RANSAC Inliers: {len(inlier_matches)}  (ratio: {inlier_ratio:.1%})",
+    ]
+    images = [kp_vis, raw_vis, ratio_vis, scene_annotated]
+
+    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+    for ax, img, title in zip(axes.flat, images, titles):
+        # Convert to RGB for matplotlib display (handles both gray and BGR)
+        if img.ndim == 2:
+            img_rgb = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+        else:
+            img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        ax.imshow(img_rgb)
+        ax.set_title(title)
+        ax.axis("off")
+
+    fig.savefig(str(output_path), dpi=150, bbox_inches="tight")
+    plt.close(fig)
 
 
 # ──────────────────── 6. Terminal Report ───────────────────────
@@ -295,14 +348,25 @@ def print_match_summary(n_raw: int, n_ratio: int, n_inlier: int, inlier_ratio: f
 
     Also check if n_ratio < 4 before RANSAC (not enough points to compute H).
     """
-    # ── Your implementation here ──
-    # Print like:
-    #   Matching Results:
-    #     Raw matches:        XXX
-    #     After Ratio Test:   XXX  (XX.X% retained)
-    #     After RANSAC:       XXX  (inlier ratio = XX.X%)
-    #     Confidence:         Medium confidence
-    pass  # TODO
+    # Determine confidence level from inlier ratio
+    if n_ratio < 4:
+        confidence = "N/A — too few matches for RANSAC"
+    elif inlier_ratio > 0.40:
+        confidence = "High confidence"
+    elif inlier_ratio > 0.20:
+        confidence = "Medium confidence"
+    elif inlier_ratio > 0.10:
+        confidence = "Low confidence"
+    else:
+        confidence = "Match failed — object may not be in scene"
+
+    # Compute retention percentage (avoid division by zero)
+    retention = (n_ratio / n_raw * 100) if n_raw > 0 else 0.0
+
+    print(f"  Raw matches:        {n_raw}")
+    print(f"  After Ratio Test:   {n_ratio}  ({retention:.1f}% retained)")
+    print(f"  After RANSAC:       {n_inlier}  (inlier ratio = {inlier_ratio:.1%})")
+    print(f"  Confidence:         {confidence}")
 
 
 # ──────────────────────────── Main ──────────────────────────────
