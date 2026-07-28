@@ -32,7 +32,7 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 # ──────────────────────────── Config ────────────────────────────
 
 ORB_NFEATURES = 500  # Number of features to detect
-RATIO_THRESHOLD = 0.75  # Lowe's ratio test threshold
+RATIO_THRESHOLD = 0.80  # Lowe's ratio test threshold
 RANSAC_REPROJ_THRESH = 5.0  # RANSAC reprojection error (pixels)
 RANSAC_CONFIDENCE = 0.99  # RANSAC confidence level
 
