@@ -136,6 +136,40 @@ def time_it(func):
     return wrapper
 
 
+# --- Synthetic image generation ---
+
+
+def generate_texture_image(w: int = 600, h: int = 400) -> np.ndarray:
+    """
+    Create a grayscale texture image with checkerboard + geometric shapes.
+
+    The image contains a checkerboard pattern overlaid with a gray rectangle,
+    a dark circle, and a light triangle — providing edges, corners, and
+    varied intensity regions ideal for feature detection experiments.
+
+    Args:
+        w: Width in pixels (default 600).
+        h: Height in pixels (default 400).
+
+    Returns:
+        Grayscale uint8 array of shape (h, w).
+    """
+    block_size = 40
+    rows, cols = np.indices((h, w))
+    checkerboard = ((rows // block_size) % 2) ^ ((cols // block_size) % 2)
+    checkerboard = checkerboard.astype(np.uint8) * 255
+
+    # Gray rectangle — provides long straight edges
+    cv2.rectangle(checkerboard, (50, 50), (150, 150), 128, -1)
+    # Dark circle — provides curved edges
+    cv2.circle(checkerboard, (400, 200), 60, 64, -1)
+    # Light triangle — provides diagonal edges
+    pts = np.array([[500, 350], [420, 250], [580, 250]], dtype=np.int32)
+    cv2.fillPoly(checkerboard, [pts], 192)
+
+    return checkerboard
+
+
 # --- Color utilities ---
 def get_hsv_range(color_name: str) -> List[Tuple[np.ndarray, np.ndarray]]:
     """Get HSV range(s) for common colors."""

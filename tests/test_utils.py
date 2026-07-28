@@ -9,6 +9,7 @@ from src.utils import (
     create_comparison_grid,
     draw_labeled_bbox,
     ensure_dir,
+    generate_texture_image,
     get_hsv_range,
     get_project_root,
     load_image,
@@ -140,3 +141,43 @@ def test_any_image_reader(tmp_path):
     cv2.imwrite(str(img_path), np.zeros((10, 10, 3), dtype=np.uint8))
     res = any_image_reader(str(img_path))
     assert res is not None
+
+
+# ──────────────────── generate_texture_image ─────────────────────
+
+
+def test_generate_texture_image_defaults():
+    """Default 600x400 → grayscale uint8 with checkerboard + shapes."""
+    img = generate_texture_image()
+    assert img.ndim == 2
+    assert img.dtype == np.uint8
+    assert img.shape == (400, 600)
+    # Checkerboard guarantees both black and white
+    assert img.min() == 0
+    assert img.max() == 255
+
+
+def test_generate_texture_image_custom_size():
+    """Custom dimensions should be reflected in output shape."""
+    img = generate_texture_image(w=200, h=100)
+    assert img.shape == (100, 200)
+    assert img.dtype == np.uint8
+    assert img.ndim == 2
+
+
+def test_generate_texture_image_shapes_present():
+    """Verify the three overlayed shapes exist (rect / circle / triangle)."""
+    img = generate_texture_image(w=600, h=400)
+    # Gray rectangle at (50,50)-(150,150) → value 128
+    assert img[75, 75] == 128, "Gray rectangle should be at (50,50)-(150,150)"
+    # Dark circle at center (400,200) → value 64
+    assert img[200, 400] == 64, "Dark circle should be centered at (400,200)"
+    # Light triangle centroid area → value 192
+    assert img[300, 500] == 192, "Light triangle should cover (500,300)"
+
+
+def test_generate_texture_image_multi_value():
+    """Checkerboard + shapes produce at least 4 distinct gray values."""
+    img = generate_texture_image()
+    unique = len(np.unique(img))
+    assert unique >= 4, f"Expected ≥4 unique values, got {unique}"
