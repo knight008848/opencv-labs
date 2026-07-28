@@ -45,7 +45,7 @@ SCENE_W, SCENE_H = 900, 600
 # and scene, keeping the script zero-external-dependency.
 
 
-def make_template(w: int = 200, h: int = 200) -> np.ndarray:
+def make_template(w: int = 300, h: int = 300) -> np.ndarray:
     """
     Create a synthetic template image by reusing ``generate_texture_image``.
 
@@ -89,11 +89,10 @@ def make_scene(template: np.ndarray) -> np.ndarray:
     rw, rh = min(new_w, SCENE_W - ox), min(new_h, SCENE_H - oy)
     template_rot = template_rot[:rh, :rw]
 
-    # Blend template into scene using a mask to avoid dark halo
+    # Blend template into scene — np.where avoids boolean-index shape issues on NumPy 2
     roi = scene[oy : oy + rh, ox : ox + rw]
     mask = template_rot > 0
-    roi[mask] = cv2.addWeighted(roi[mask], 0.0, template_rot[mask], 1.0, 0)
-    scene[oy : oy + rh, ox : ox + rw] = roi
+    scene[oy : oy + rh, ox : ox + rw] = np.where(mask, template_rot, roi)
 
     return scene
 
@@ -130,10 +129,9 @@ def match_raw(desc1: np.ndarray, desc2: np.ndarray) -> list[cv2.DMatch]:
         sorted list of DMatch objects
     """
     # ── Your implementation here ──
-    bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+    bf = cv2.BFMatcher(cv2.NORM_HAMMING)
     matches = bf.match(desc1, desc2)
-    matches.sort(key=lambda x: x.distance)
-    return matches
+    return sorted(matches, key=lambda x: x.distance)
 
 
 def match_ratio_test(
@@ -151,7 +149,7 @@ def match_ratio_test(
         list of DMatch objects that passed Ratio Test
     """
     # ── Your implementation here ──
-    bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+    bf = cv2.BFMatcher(cv2.NORM_HAMMING)
     matches = bf.knnMatch(desc1, desc2, k=2)
     good_matches = [m for m, n in matches if m.distance < ratio * n.distance]
     return good_matches
@@ -184,7 +182,9 @@ def match_ransac(
         H = 3x3 homography matrix (or None if not found)
     """
     # ── Your implementation here ──
-    # Edge case: if len(good_matches) < 4, RANSAC can't work → return (None, [], 0.0)
+    if len(good_matches) < 4:
+        return (None, [], 0.0)
+
     src_pts = np.float32([kp1[m.queryIdx].pt for m in good_matches])
     dst_pts = np.float32([kp2[m.trainIdx].pt for m in good_matches])
 
@@ -207,13 +207,15 @@ def draw_keypoints_side_by_side(
     Stack horizontally with np.hstack.
     """
     # ── Your implementation here ──
-    img1_keypoints = cv2.drawKeypoints(
-        img1, kp1, None, flags=cv2.DrawKeypointsFlags_DRAW_RICH_KEYPOINTS
-    )
-    img2_keypoints = cv2.drawKeypoints(
-        img2, kp2, None, flags=cv2.DrawKeypointsFlags_DRAW_RICH_KEYPOINTS
-    )
-    return np.hstack([img1_keypoints, img2_keypoints])
+    img1_kp = cv2.drawKeypoints(img1, kp1, None, flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+    img2_kp = cv2.drawKeypoints(img2, kp2, None, flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+    # Resize to match height so hstack works
+    target_h = max(img1_kp.shape[0], img2_kp.shape[0])
+    scale1 = target_h / img1_kp.shape[0]
+    scale2 = target_h / img2_kp.shape[0]
+    img1_kp = cv2.resize(img1_kp, None, fx=scale1, fy=scale1)
+    img2_kp = cv2.resize(img2_kp, None, fx=scale2, fy=scale2)
+    return np.hstack([img1_kp, img2_kp])
 
 
 def draw_matches(
@@ -268,14 +270,22 @@ def draw_object_box(scene: np.ndarray, template_shape: tuple, H: np.ndarray | No
     # ── Your implementation here ──
     # Note: Convert grayscale to BGR first for colored annotations.
     if H is None:
-        scene = cv2.putText(
-            scene, "MATCH FAILED", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2
+        scene_color = cv2.cvtColor(scene, cv2.COLOR_GRAY2BGR)
+        scene_color = cv2.putText(
+            scene_color,
+            "MATCH FAILED",
+            (10, 30),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1,
+            (0, 0, 255),
+            2,
         )
-        return scene
-    w, h = template_shape
+        return scene_color
+    h, w = template_shape
     corners = np.float32([[0, 0], [w, 0], [w, h], [0, h]]).reshape(-1, 1, 2)
-    projected_corners = cv2.perspectiveTransform(corners, H)
-    scene = cv2.polylines(scene, [projected_corners], True, (0, 255, 0), 3)
+    projected_corners = np.int32(cv2.perspectiveTransform(corners, H))
+    scene_color = cv2.cvtColor(scene, cv2.COLOR_GRAY2BGR)
+    scene = cv2.polylines(scene_color, [projected_corners], True, (0, 255, 0), 3)
     return scene
 
 
