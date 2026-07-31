@@ -11,6 +11,7 @@ See CLAUDE.md for headless policy.
 """
 
 import math
+import time
 from pathlib import Path
 
 import cv2
@@ -106,7 +107,7 @@ def annotate_frame(frame: np.ndarray, frame_idx: int, timestamp: float) -> np.nd
     return frame
 
 
-def extract_and_annotate(meta: dict, out_dir: Path) -> list[np.ndarray]:
+def extract_and_annotate(video_path: Path, meta: dict, out_dir: Path) -> list[np.ndarray]:
     """
     Read the video, every SAMPLE_INTERVAL-th frame:
       1. Compute timestamp = frame_idx / fps
@@ -115,11 +116,11 @@ def extract_and_annotate(meta: dict, out_dir: Path) -> list[np.ndarray]:
       4. Append to list of annotated frames
     Return the list of annotated frames (for video assembly).
 
-    Also track processing time.
+    Prints elapsed extraction + annotation time.
     """
     # ── Your implementation here ──
     # Hint:
-    #   cap = cv2.VideoCapture(str(VIDEO_PATH))
+    #   cap = cv2.VideoCapture(str(video_path))
     #   annotated_frames = []
     #   frame_idx = 0
     #   while True:
@@ -133,20 +134,25 @@ def extract_and_annotate(meta: dict, out_dir: Path) -> list[np.ndarray]:
     #       frame_idx += 1
     #   cap.release()
     #   return annotated_frames
-    cap = cv2.VideoCapture(str(VIDEO_PATH))
+    start = time.perf_counter()
+    cap = cv2.VideoCapture(str(video_path))
     annotated_frames = []
     frame_idx = 0
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-        if frame_idx % SAMPLE_INTERVAL == 0:
-            timestamp = frame_idx / meta["fps"]
-            annotated = annotate_frame(frame, frame_idx, timestamp)
-            cv2.imwrite(str(out_dir / f"frame_{frame_idx:06d}.png"), annotated)
-            annotated_frames.append(annotated)
-        frame_idx += 1
-    cap.release()
+    try:
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            if frame_idx % SAMPLE_INTERVAL == 0:
+                timestamp = frame_idx / meta["fps"]
+                annotated = annotate_frame(frame, frame_idx, timestamp)
+                cv2.imwrite(str(out_dir / f"frame_{frame_idx:06d}.png"), annotated)
+                annotated_frames.append(annotated)
+            frame_idx += 1
+    finally:
+        cap.release()
+    elapsed = time.perf_counter() - start
+    print(f"  Extraction + annotation took {elapsed:.2f}s")
     return annotated_frames
 
 
@@ -203,7 +209,7 @@ def main() -> None:
 
         # ── Step 2: Extract + annotate frames ──
         print("\n[2/4] Extracting every 5th frame and annotating...")
-        frames = extract_and_annotate(meta, OUTPUT_DIR)
+        frames = extract_and_annotate(VIDEO_PATH, meta, OUTPUT_DIR)
         print(f"  Saved {len(frames)} annotated frames to {OUTPUT_DIR}")
 
         # ── Step 3: Assemble video ──
