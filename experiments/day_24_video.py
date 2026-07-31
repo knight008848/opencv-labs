@@ -84,6 +84,8 @@ def print_metadata(meta: dict) -> None:
     print(f"Video duration: {duration:.3f}s")
     print(f"Video width: {meta['width']}, height: {meta['height']}")
     print(f"Video fourcc: {meta['fourcc']}")
+    print(f"Video FPS: {meta['fps']:.2f}")
+    print(f"Video frame count: {meta['frame_count']}")
 
 
 # ──────────────────── 2. Frame Extraction + Annotation ──────────
@@ -156,7 +158,7 @@ def assemble_video(frames: list[np.ndarray], meta: dict, out_path: Path) -> None
     Combine annotated frames into a new MP4 using VideoWriter.
     - fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     - FPS = meta["fps"]  (source speed)
-    - Size = (meta["width"], meta["height"]) — MUST match frame size
+    - Size = (w, h) from frames[0].shape — derived from actual frames
     Print the number of frames written and total time.
     """
     # ── Your implementation here ──
@@ -167,7 +169,10 @@ def assemble_video(frames: list[np.ndarray], meta: dict, out_path: Path) -> None
     #   writer.release()
     #   Verify output file exists and is non-zero size.
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    writer = cv2.VideoWriter(str(out_path), fourcc, meta["fps"], (meta["width"], meta["height"]))
+    h, w = frames[0].shape[:2]
+    writer = cv2.VideoWriter(str(out_path), fourcc, meta["fps"], (w, h))
+    if not writer.isOpened():
+        raise RuntimeError(f"Failed to open video writer: {out_path}")
     for frame in frames:
         writer.write(frame)
     writer.release()
