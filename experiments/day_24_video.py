@@ -4,7 +4,7 @@ File: day_24_video.py
 Goal: Analyze an MP4 — print metadata, extract every 5th frame,
       overlay frame number + timestamp, re-encode to a new MP4.
 Deliverable: annotated frames + annotated video + terminal summary
-Runtime: ~2 min
+Runtime: ~3-4 min
 
 Headless note: All visualisation via matplotlib savefig.
 See CLAUDE.md for headless policy.
@@ -107,83 +107,68 @@ def annotate_frame(frame: np.ndarray, frame_idx: int, timestamp: float) -> np.nd
     return frame
 
 
-def extract_and_annotate(video_path: Path, meta: dict, out_dir: Path) -> list[np.ndarray]:
+def extract_and_annotate(video_path: Path, meta: dict, out_dir: Path, out_video_path: Path) -> int:
     """
-    Read the video, every SAMPLE_INTERVAL-th frame:
+    Read the video, every SAMPLE_INTERVAL-th frame, in a single pass:
       1. Compute timestamp = frame_idx / fps
       2. Annotate with frame number + timestamp
       3. Save as {frame_idx:06d}.png in out_dir
-      4. Append to list of annotated frames
-    Return the list of annotated frames (for video assembly).
+      4. Write the annotated frame to the output video (VideoWriter)
+    Return the number of annotated frames saved to disk.
 
     Prints elapsed extraction + annotation time.
     """
     # ── Your implementation here ──
-    # Hint:
+    # Hint (single pass — read, annotate, write PNG + video frame):
     #   cap = cv2.VideoCapture(str(video_path))
-    #   annotated_frames = []
     #   frame_idx = 0
+    #   saved = 0
+    #   writer = None
     #   while True:
     #       ret, frame = cap.read()
     #       if not ret: break
     #       if frame_idx % SAMPLE_INTERVAL == 0:
+    #           if writer is None:               # lazy-init on first sampled frame
+    #               h, w = frame.shape[:2]       # derive size from actual frame
+    #               writer = cv2.VideoWriter(str(out_video_path), fourcc, meta["fps"], (w, h))
     #           timestamp = frame_idx / meta["fps"]
     #           annotated = annotate_frame(frame, frame_idx, timestamp)
     #           cv2.imwrite(str(out_dir / f"frame_{frame_idx:06d}.png"), annotated)
-    #           annotated_frames.append(annotated)
+    #           writer.write(annotated)
+    #           saved += 1
     #       frame_idx += 1
-    #   cap.release()
-    #   return annotated_frames
+    #   cap.release(); writer.release()
+    #   return saved
     start = time.perf_counter()
     cap = cv2.VideoCapture(str(video_path))
-    annotated_frames = []
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     frame_idx = 0
+    saved = 0
+    writer = None
     try:
         while True:
             ret, frame = cap.read()
             if not ret:
                 break
             if frame_idx % SAMPLE_INTERVAL == 0:
+                if writer is None:
+                    h, w = frame.shape[:2]
+                    writer = cv2.VideoWriter(str(out_video_path), fourcc, meta["fps"], (w, h))
+                    if not writer.isOpened():
+                        raise RuntimeError(f"Failed to open video writer: {out_video_path}")
                 timestamp = frame_idx / meta["fps"]
                 annotated = annotate_frame(frame, frame_idx, timestamp)
                 cv2.imwrite(str(out_dir / f"frame_{frame_idx:06d}.png"), annotated)
-                annotated_frames.append(annotated)
+                writer.write(annotated)
+                saved += 1
             frame_idx += 1
     finally:
         cap.release()
+        if writer is not None:
+            writer.release()
     elapsed = time.perf_counter() - start
     print(f"  Extraction + annotation took {elapsed:.2f}s")
-    return annotated_frames
-
-
-# ──────────────────── 3. Video Assembly ─────────────────────────
-
-
-def assemble_video(frames: list[np.ndarray], meta: dict, out_path: Path) -> None:
-    """
-    Combine annotated frames into a new MP4 using VideoWriter.
-    - fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    - FPS = meta["fps"]  (source speed)
-    - Size = (w, h) from frames[0].shape — derived from actual frames
-    Print the number of frames written and total time.
-    """
-    # ── Your implementation here ──
-    # Hint:
-    #   h, w = frames[0].shape[:2]
-    #   writer = cv2.VideoWriter(str(out_path), fourcc, meta["fps"], (w, h))
-    #   for frame in frames: writer.write(frame)
-    #   writer.release()
-    #   Verify output file exists and is non-zero size.
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    h, w = frames[0].shape[:2]
-    writer = cv2.VideoWriter(str(out_path), fourcc, meta["fps"], (w, h))
-    if not writer.isOpened():
-        raise RuntimeError(f"Failed to open video writer: {out_path}")
-    for frame in frames:
-        writer.write(frame)
-    writer.release()
-    if not out_path.exists() or out_path.stat().st_size == 0:
-        raise RuntimeError(f"Failed to write video to {out_path}")
+    return saved
 
 
 # ──────────────────────────── Main ──────────────────────────────
@@ -193,9 +178,8 @@ def main() -> None:
     """
     Pipeline:
       1. Extract + print video metadata
-      2. Extract every 5th frame, annotate, save PNGs
-      3. Assemble annotated frames into new MP4
-      4. Print summary (frames processed, elapsed time)
+      2. Single pass: extract every 5th frame, annotate, write PNGs + video
+      3. Verify saved frame count
     """
     print("\n" + "=" * 55)
     print("  Day 24 — Video I/O Analysis")
@@ -203,24 +187,20 @@ def main() -> None:
 
     try:
         # ── Step 1: Metadata ──
-        print("\n[1/4] Reading video metadata...")
+        print("\n[1/3] Reading video metadata...")
         meta = get_video_metadata(VIDEO_PATH)
         print_metadata(meta)
 
-        # ── Step 2: Extract + annotate frames ──
-        print("\n[2/4] Extracting every 5th frame and annotating...")
-        frames = extract_and_annotate(VIDEO_PATH, meta, OUTPUT_DIR)
-        print(f"  Saved {len(frames)} annotated frames to {OUTPUT_DIR}")
-
-        # ── Step 3: Assemble video ──
-        print("\n[3/4] Assembling annotated video...")
+        # ── Step 2: Single-pass extract + annotate + assemble ──
+        print("\n[2/3] Extracting every 5th frame, annotating, writing video...")
         video_path = PROJECT_DIR / "data" / "processed" / "day_24_annotated.mp4"
-        assemble_video(frames, meta, video_path)
-        print(f"  Saved: {video_path}")
+        saved = extract_and_annotate(VIDEO_PATH, meta, OUTPUT_DIR, video_path)
+        print(f"  Saved {saved} annotated frames to {OUTPUT_DIR}")
+        print(f"  Saved video: {video_path}")
 
-        # ── Step 4: Verify count ──
+        # ── Step 3: Verify count ──
         expected = math.ceil(meta["frame_count"] / SAMPLE_INTERVAL)
-        print(f"\n[4/4] Verification: saved {len(frames)} frames, expected {expected}")
+        print(f"\n[3/3] Verification: saved {saved} frames, expected {expected}")
 
     except Exception as e:
         print(f"\n[ERROR] Pipeline failed: {e}")
