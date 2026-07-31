@@ -12,6 +12,11 @@ venv/
 .venv/
 env/
 
+# Environment files
+.env
+.env.*
+!.env.example
+
 # IDE
 .vscode/
 .idea/
