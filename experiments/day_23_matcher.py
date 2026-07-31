@@ -36,7 +36,6 @@ RATIO_THRESHOLD = 0.80  # Lowe's ratio test threshold
 RANSAC_REPROJ_THRESH = 5.0  # RANSAC reprojection error (pixels)
 RANSAC_CONFIDENCE = 0.99  # RANSAC confidence level
 
-CANVAS_W, CANVAS_H = 600, 400
 SCENE_W, SCENE_H = 900, 600
 
 

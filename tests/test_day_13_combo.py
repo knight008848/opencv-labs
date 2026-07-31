@@ -8,23 +8,22 @@ Run with:
 from __future__ import annotations
 
 import importlib.util
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 import cv2
+import matplotlib
 import numpy as np
+
+# Headless matplotlib backend (must be set *before* the D13 module code runs)
+matplotlib.use("Agg")
 
 # Force source-level import (bypass stale .pyc cache)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SRC_PATH = PROJECT_ROOT / "experiments" / "day_13_combo.py"
 spec = importlib.util.spec_from_file_location("day_13_combo", SRC_PATH)
 D13 = importlib.util.module_from_spec(spec)
-
-# Headless matplotlib (must be set *before* the module code runs)
-import matplotlib
-matplotlib.use("Agg")
 
 spec.loader.exec_module(D13)
 
@@ -304,6 +303,7 @@ class TestProcessSingleImage(unittest.TestCase):
 
     def tearDown(self):
         import shutil
+
         shutil.rmtree(str(self.tmp), ignore_errors=True)
 
     def _write(self, name, img):
@@ -340,7 +340,9 @@ class TestProcessSingleImage(unittest.TestCase):
     def test_dict_keys(self):
         p = self._write("doc.jpg", D13._make_test_document())
         r = D13.process_single_image(p)
-        self.assertEqual(set(r.keys()), {"path", "success", "area", "corners", "warped", "steps_log"})
+        self.assertEqual(
+            set(r.keys()), {"path", "success", "area", "corners", "warped", "steps_log"}
+        )
 
     def test_no_document_in_scene(self):
         """A natural photo without a document should fail gracefully."""
@@ -361,6 +363,7 @@ class TestProcessSingleImage(unittest.TestCase):
 class TestBuildReport(unittest.TestCase):
     def tearDown(self):
         import matplotlib.pyplot as plt
+
         plt.close("all")
 
     def _gray(self):
@@ -374,8 +377,11 @@ class TestBuildReport(unittest.TestCase):
 
     def test_without_corners(self):
         g = self._gray()
-        self.assertIsNotNone(D13.build_combo_report(g, None, g, g,
-            np.zeros((1, 1), np.uint8), np.zeros((1, 1), np.uint8), None))
+        self.assertIsNotNone(
+            D13.build_combo_report(
+                g, None, g, g, np.zeros((1, 1), np.uint8), np.zeros((1, 1), np.uint8), None
+            )
+        )
 
 
 # ================================================================
