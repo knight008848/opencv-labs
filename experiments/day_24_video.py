@@ -125,7 +125,20 @@ def extract_and_annotate(meta: dict, out_dir: Path) -> list[np.ndarray]:
     #       frame_idx += 1
     #   cap.release()
     #   return annotated_frames
-    pass  # TODO
+    cap = cv2.VideoCapture(str(VIDEO_PATH))
+    annotated_frames = []
+    frame_idx = 0
+    while True:
+        ret, frame = cap.read()
+        if not ret: break
+        if frame_idx % SAMPLE_INTERVAL == 0:
+            timestamp = frame_idx / meta["fps"]
+            annotated = annotate_frame(frame, frame_idx, timestamp)
+            cv2.imwrite(str(out_dir / f"frame_{frame_idx:06d}.png"), annotated)
+            annotated_frames.append(annotated)
+        frame_idx += 1
+    cap.release()
+    return annotated_frames
 
 
 # ──────────────────── 3. Video Assembly ─────────────────────────
