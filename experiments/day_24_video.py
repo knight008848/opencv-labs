@@ -11,8 +11,6 @@ See CLAUDE.md for headless policy.
 """
 
 import math
-import sys
-import time
 from pathlib import Path
 
 import cv2
@@ -26,8 +24,8 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # ──────────────────────────── Config ────────────────────────────
 
-SAMPLE_INTERVAL = 5        # save every 5th frame
-OUTPUT_FPS = 10            # FPS of output video
+SAMPLE_INTERVAL = 5  # save every 5th frame
+
 VIDEO_PATH = PROJECT_DIR / "data" / "raw" / "rgb_79c1787d6c.mp4"  # adjust if needed
 
 # ──────────────────── 1. Metadata Extraction ────────────────────
@@ -54,10 +52,12 @@ def get_video_metadata(video_path: Path) -> dict:
     #   fourcc_str = "".join([chr((fourcc_int >> 8 * i) & 0xFF) for i in range(4)])
     #   cap.release()
     #   return {...}
-    if not video_path.exists(): raise FileNotFoundError(f"Video file not found: {video_path}")
+    if not video_path.exists():
+        raise FileNotFoundError(f"Video file not found: {video_path}")
 
     cap = cv2.VideoCapture(str(video_path))
-    if not cap.isOpened(): raise RuntimeError(f"Failed to open video file: {video_path}")
+    if not cap.isOpened():
+        raise RuntimeError(f"Failed to open video file: {video_path}")
     fps = cap.get(cv2.CAP_PROP_FPS)
     frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -65,7 +65,13 @@ def get_video_metadata(video_path: Path) -> dict:
     fourcc_int = int(cap.get(cv2.CAP_PROP_FOURCC))
     fourcc_str = "".join([chr((fourcc_int >> 8 * i) & 0xFF) for i in range(4)])
     cap.release()
-    return {"fps": fps, "frame_count": frame_count, "width": width, "height": height, "fourcc": fourcc_str}
+    return {
+        "fps": fps,
+        "frame_count": frame_count,
+        "width": width,
+        "height": height,
+        "fourcc": fourcc_str,
+    }
 
 
 def print_metadata(meta: dict) -> None:
@@ -130,7 +136,8 @@ def extract_and_annotate(meta: dict, out_dir: Path) -> list[np.ndarray]:
     frame_idx = 0
     while True:
         ret, frame = cap.read()
-        if not ret: break
+        if not ret:
+            break
         if frame_idx % SAMPLE_INTERVAL == 0:
             timestamp = frame_idx / meta["fps"]
             annotated = annotate_frame(frame, frame_idx, timestamp)
@@ -148,20 +155,21 @@ def assemble_video(frames: list[np.ndarray], meta: dict, out_path: Path) -> None
     """
     Combine annotated frames into a new MP4 using VideoWriter.
     - fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    - FPS = OUTPUT_FPS
+    - FPS = meta["fps"]  (source speed)
     - Size = (meta["width"], meta["height"]) — MUST match frame size
     Print the number of frames written and total time.
     """
     # ── Your implementation here ──
     # Hint:
     #   h, w = frames[0].shape[:2]
-    #   writer = cv2.VideoWriter(str(out_path), fourcc, OUTPUT_FPS, (w, h))
+    #   writer = cv2.VideoWriter(str(out_path), fourcc, meta["fps"], (w, h))
     #   for frame in frames: writer.write(frame)
     #   writer.release()
     #   Verify output file exists and is non-zero size.
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    writer = cv2.VideoWriter(str(out_path), fourcc, OUTPUT_FPS, (meta["width"], meta["height"]))
-    for frame in frames: writer.write(frame)
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    writer = cv2.VideoWriter(str(out_path), fourcc, meta["fps"], (meta["width"], meta["height"]))
+    for frame in frames:
+        writer.write(frame)
     writer.release()
     if not out_path.exists() or out_path.stat().st_size == 0:
         raise RuntimeError(f"Failed to write video to {out_path}")
