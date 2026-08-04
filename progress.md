@@ -49,94 +49,118 @@
 
 ## 每日学习日志
 
-### Day 17 (2026-07-14) — 模块 8 概念 A：轮廓提取
+### Day 25 (2026-08-04) — 模块 11 概念 B：帧差法运动检测 + 背景减除
 
 **完成事项：**
-- [x] 骨架搭建：load_image / preprocess / find_objects / draw_labeled_objects / build_debug_grid
-- [x] find_objects：findContours + RETR_EXTERNAL + CHAIN_APPROX_SIMPLE + area 过滤 + 降序排序
-- [x] get_color_palette：HSV 色相均匀采样 → BGR 元组，保证轮廓颜色区分
-- [x] draw_labeled_objects：逐轮廓上色 + cv2.moments 质心 + putText 标注 ID/面积
-- [x] build_debug_grid：2×2 管线中间结果可视化
-- [x] main：PORTABLE 路径 + 真实照片自动缩放 + 全流程接通
-- [x] 空轮廓保护（get_color_palette(0) 不会崩溃）
-- [x] 跑通 IMG_0701.png：找到 10 个物体，面积 769~2,202 px²
+- [x] 素材体检：滚动球.mp4（1080p/30fps/23s/690 帧）逐像素 std 分析 → 99.3% 像素随时间变化（相机不稳 + 中间手入画）
+- [x] 6 函数实现：init_background_subtractor / process_frame / find_moving_objects / draw_detections / update_trajectories / build_three_panel
+- [x] process_frame：MOG2.apply 三值（0/127/255）→ 阴影 127 必须排除（`==255` 才算前景）→ MORPH_OPEN 清理
+- [x] update_trajectories：贪心最近邻 + 防重用 + preexisting 快照（新轨迹不被误删）
+- [x] 4 处 bug 修复：轨迹 3 处（防重用/迭代删除/新轨迹误删）+ VideoWriter 尺寸 1 处
+- [x] 端到端跑通：552 帧 @24fps 三面板视频（19.5MB）+ 10 张 panel PNG，0 写帧失败
+- [x] 参数调优：27 组扫描（varThreshold×kernel×MIN_AREA）→ MIN_AREA 200→8000、kernel 5→9×9
+- [x] 调参效果：5-10s 基准 mean 4.2→1.0；前 5s 14.7→1.7；10-15s 10.6→2.2；15-23s 22.2→2.5
+- [x] 检测可视化验证：frame 160 绿框（152×114）正确套住球（直径 ~125px）
+- [x] 6 个 commit + push（素材切换 / bug 修复 / lint / 写帧修复 / 参数调优）
 
 **关键发现：**
-- Canny 边缘占比 2.3%，阈值 (50, 150) 对桌面场景适中——没有过度噪点也没漏主要轮廓
-- CHAIN_APPROX_SIMPLE 压缩后轮廓点数大幅减少，但 contourArea 精度不受影响
-- 路径写死 vs SCRIPT_DIR/PROJECT_DIR 可移植性差异明显——后者在 VM 和本地之间自动适配
+- 检测前必须先做素材体检：99.3% 像素随时间变化 = 相机不稳，背景减除会"全屏报警"——这是素材选型的第一道闸
+- 前 5s"看似干净"但 MOG2 仍报 14.7 碎片/帧：根因是 MIN_AREA=200 太松（50% 碎片 <200px），球本体 ~12,400px
+- VideoWriter 用原始帧尺寸初始化、写入三面板尺寸 → FFmpeg 静默丢帧，输出 257 字节空文件；writer 必须按实际写入帧的 shape 初始化
+- mp4v（YUV 4:2:0）要求偶数宽高，面板宽度要对齐到偶数
+
+**错误分析：**
+- A：update_trajectories 新 spawn 的轨迹不在 matched_trails 里，被删除循环当"过期轨迹"误删——需 preexisting 快照区分"本帧前已存在的轨迹"
+- K：VideoWriter 尺寸 ≠ 实际写入帧尺寸（与 Day 24 的 meta 声明 vs shape 实物同源，这次是 writer 初始化对象选错）
+- C：迭代 `trails.keys()` 时 del → `RuntimeError: dictionary changed size during iteration`，应先 `list(keys())` 快照
 
 **复盘三问：**
-1. findContours 返回的是坐标列表还是二值图？坐标列表。每个轮廓是一组 `(x, y)` 点，不是像素掩码。这是"图像处理"和"图像分析"的分水岭。
-2. RETR_EXTERNAL vs RETR_TREE 什么时候用？只数物体个数→EXTERNAL；需要知道物体嵌套关系（如在框里的文字）→TREE。
-3. 轮廓 Pipeline 和最终项目的关系？数物体+算属性正是最终项目"多 ROI 分窗分析"的核心：每个 ROI 独立做轮廓提取和特征计算。
+1. 帧差法 vs MOG2 的本质区别？帧差法比较相邻两帧，只捕捉"相邻时刻的变化"（物体静止即消失）；MOG2 为每像素建高斯混合背景模型，容忍缓慢光照变化，物体静止仍能报出。两者都要求相机固定。
+2. 为什么"高架车流"比滚动球视频更适合背景减除？高架监控相机固定（满足硬门槛）、背景路面统一。但车多引入遮挡、blob 合并、阴影、速度超匹配距离四个新难点——"目标多"是新的复杂度，不是简单的"更好"。
+3. 和最终项目的关系？MOG2 前景 mask + 轨迹关联就是"帧间物体追踪"的原型；素材体检（先验证相机稳定）是数据管道第一步——坏素材要提前识别，否则下游全输出垃圾。
 
-### Day 18 (2026-07-16) — 模块 8 概念 B+C：轮廓几何属性 + 形状分类
+### Day 24 (2026-07-31) — 模块 11 概念 A：视频 I/O
 
 **完成事项：**
-- [x] compute_properties：area / arcLength / moments 质心 / boundingRect / minAreaRect / circularity / aspect_ratio
-- [x] m00 零保护 + minAreaRect 三层解包陷阱修复
-- [x] classify_shape：approxPolyDP 四种形状分类（Triangle / Rectangle / Circle / Irregular）
-- [x] draw_boxes：轴对齐矩形（蓝）+ 旋转矩形（绿）双层叠加 + 形状标签
-- [x] save_csv：csv.DictWriter 输出属性表（float 四舍五入到 2 位小数）
-- [x] build_debug_grid：Panel 4 读取 CSV 并渲染为 monospace 文本表格
-- [x] main() 串联完整 Pipeline：合成图 9 个物体全部检出
+- [x] get_video_metadata：fps / frame_count / width / height / fourcc（位运算解码成 4 字符）
+- [x] print_metadata：补全 fps + frame_count，docstring 与实现一致
+- [x] annotate_frame：帧号 + 时间戳 putText 标注（frame=00000 t=0.000s）
+- [x] extract_and_annotate：每 5 帧抽取 + 标注 + 存 PNG + 单趟写视频（源速 60fps）
+- [x] 8 项修复计划全部完成（#1-#8）
+- [x] 单趟重构：合并抽帧与组装，内存 O(N) → O(1)（Max RSS 3.2GB → 290MB）
+- [x] 全程 ruff lint/format 全绿 + 安全提交流程固化到 CLAUDE.md
+- [x] Git push 完成
+
+**错误分析：**
+- A：`saved += 1` 缩进放错层级——放在 `if frame_idx % SAMPLE_INTERVAL` 外，每帧都计数（1837 而非 368）。计数必须和"是否采样"同一分支
+- 流程：临时 index 提交未先 read-tree HEAD，把整个仓库提交成"删除 51 个文件"——用 read-tree HEAD 修复，并固化安全流程到 CLAUDE.md
+- 环境：/mnt/d 幽灵 index.lock（9p loose cache），rm/sync 无法根治，安全流程可稳定绕开
 
 **关键发现：**
-- minAreaRect 返回嵌套三层元组 `((cx,cy),(w,h),angle)`，不是 5 个独立值——Day 18 踩坑
-- 合成图（type_test.png）上 9 个物体检出结果：3 Triangle / 2 Rectangle / 2 Circle / 2 Irregular
-- 圆度理论值：完美圆=1.0，正方形≈0.785，长条矩形圆度远低于 0.6
-- 六角星被 approxPolyDP(epsilon=0.02) 压成 3 个顶点→归类为 Triangle，是 epsilon 过大的典型误分类
+- 元数据语义：meta["width"] 是"源的声明尺寸"，frame.shape 是"实际帧尺寸"——resize 后两者分叉，VideoWriter 尺寸必须跟实际帧走
+- 两趟式 vs 单趟式：内存 O(N)→O(1)，时间不变（总工作量相同）——单趟是"演示脚本"到"数据管道"的分水岭，管道能跑任意长度视频
+- 输出视频改源速后，播放进度与标注时间戳一致
 
 **复盘三问：**
-1. compute_properties 为什么写 `moments(cnt)` 而不是逐个算？图像矩一次调用能拿到所有矩值（m00、m10、m01…），避免重复遍历轮廓。一次调用、字典取值——更快也更干净。
-2. minAreaRect 的三层嵌套怎么解？用 `((cx, cy), (w, h), angle)` 解包，这是最直接的方式。也可以用下标 `rect[0][0]`，但可读性差。
-3. approxPolyDP 的形状分类在什么条件下会失效？物体被遮挡导致轮廓残缺，或者透视变形导致矩形成梯形→approx 顶点数变 4 以上→被分错类。epsilon 的 0.02 经验值也需要根据物体大小微调。
+1. meta 尺寸和 frame.shape 什么时候会不一致？抽帧时加了 resize/变换。meta 是编解码器"声明"，shape 是解码后的"实物"——写视频必须按实物尺寸。
+2. 为什么单趟式内存大降而时间不变？总工作量（解码+标注+编码）没变，只是把"攒满列表再消费"改成"边读边写"，驻留从 N 帧变 1 帧。
+3. 和最终项目的关系？MP4→结构化数据管道必须能处理任意长度视频——单趟流式是基础；VideoCapture 是管道入口（读帧），VideoWriter 是出口（可视化输出）。
 
-### Day 19 (2026-07-17) — 模块 9 概念 A+B：霍夫直线 + 圆检测
+### Day 23 (2026-07-28) — 模块 10 概念 B+C：ORB 特征匹配 + Ratio Test + RANSAC
 
 **完成事项：**
-- [x] detect_lines：HoughLinesP 直线检测（threshold / minLineLength / maxLineGap 调参）
-- [x] detect_circles：HoughCircles 圆检测（param2 调参 + dp / minDist / minRadius / maxRadius）
-- [x] draw_lines / draw_circles：线段 + 圆周 + 圆心标注
-- [x] sweep_line_threshold：threshold=[30,60,100,150] 1×4 网格对比
-- [x] sweep_circle_param2：param2=[20,30,40,50] 1×4 网格对比
-- [x] build_debug_grid：2×2 灰度/边缘/直线/圆综合展示
-- [x] 合成图 type_test.png：检测到 46 条直线 + 9 个圆（param2=30 偏松，有重复检测）
+- [x] 费曼拆解：Ratio Test = "最像 vs 次像差距大才保留"，RANSAC = "少数服从多数"筛误匹配
+- [x] make_template：复用 generate_texture_image(300,300) 生成模板图
+- [x] make_scene：generate_texture_image(900,600) 背景 + 随机偏移旋转 (0-45°) 嵌入模板，np.where 掩码叠加
+- [x] detect_keypoints：Day 22 函数直接复用
+- [x] match_raw：BFMatcher.match → sorted by distance
+- [x] match_ratio_test：BFMatcher.knnMatch(k=2) → m.distance < 0.75 * n.distance
+- [x] match_ransac：findHomography(RANSAC) → inlier_mask → inlier_ratio
+- [x] draw_keypoints_side_by_side：np.hstack 拼接两张 Rich Keypoints 图
+- [x] draw_matches：cv2.drawMatches 连线可视化
+- [x] draw_object_box：cv2.perspectiveTransform 投影四角 → polylines 绿框 / MATCH FAILED 保护
+- [x] build_comparison_panel：2×2 四阶段对比图（KP / Raw / Ratio / RANSAC）
+- [x] print_match_summary：三步过滤数 + Inlier Ratio + Confidence 四级判定
+- [x] 重构：make_template/make_scene 改用 generate_texture_image 消除重复代码
+- [x] Git push 完成
 
 **关键发现：**
-- 霍夫直线 vs 轮廓法的本质区别：投票 vs 追踪——前者用参数空间投票找出"最可能存在的几何形状"，后者用连通组件追踪"实际的闭合边界"
-- param2=30 检测 9 个圆但包含重复检测（同一个圆被不同半径检测多次），param2=50 会漏检——trade-off 是调参核心
-- HoughCircles 输入是灰度图（非边缘图），内部自建 Canny——而 HoughLinesP 输入是边缘图
-- 46 条直线中部分线段是连接矩形和三角形的边界线，threshold=60 较好地平衡了"不漏主线"和"不捡噪点"
+- 合成图匹配结果：Raw=198 → Ratio=23 → RANSAC=4 (17.4% inlier) → Low confidence
+- Ratio Test 保留率仅 11.6%——棋盘格纹理高度重复，BFMatcher 无法区分"哪个角点匹配哪个角点"
+- 4 个内点刚好画出绿色框，但内点率 17.4% 低于模块验收标准的 20%
+- 根因分析：生成式纹理（棋盘格）的特征点彼此相似，不像真实物体（书封面/logo）有独一无二的纹理
+- np.where(mask, tpl, roi) 替代 cv2.addWeighted + 布尔索引，兼容 NumPy 2
 
 **复盘三问：**
-1. 霍夫直线和轮廓法检测直线的方式有什么不同？轮廓法先找闭合边界再 approxPolyDP 判断边数——前提是直线必须构成封闭图形的边。霍夫直接检测任意方向的非闭合线段——只要边缘点在投票空间中有足够多的共线点。前者"找形状"，后者"找直线"。
-2. threshold 在 Hough 和 Canny 中的含义有何区别？Canny 的 threshold 是梯度强度阈值（滞后连接用的）；Hough 的 threshold 是最少投票数（最少有多少个像素共线才算直线）。同名不同义。
-3. 霍夫检测和最终项目的关系？最终项目的"帧间物体追踪"环节中，如果场景中有直线特征（如桌面边缘、工件边界），霍夫直线可以作为特征点的补充线索——结合轮廓的质心追踪和霍夫的直线追踪提供更鲁棒的帧间对齐。
+1. Ratio Test 的 0.75 这个值怎么来的？Lowe 在 SIFT 论文中提出的经验值。0.75 意味着最近邻距离必须比次近邻小 25% 以上才可信。棋盘格角点的最近邻和次近邻距离几乎相等（因为角点都长得像），所以大量被筛掉。
+2. RANSAC 为什么需要至少 4 对点？单应矩阵 H 是 3×3 有 8 个自由度（右下角归一化为 1），每对点提供 2 个方程（x 和 y），4×2=8 刚好够解。3 对点只有 6 个方程，欠定。
+3. 特征匹配和最终项目的关系？帧间追踪的核心就是跨帧匹配——当前帧的特征点去下一帧找匹配。今天的实验是单次匹配，项目需要变成循环匹配（每帧匹配上一帧）。内点率 17.4% 在真实场景中会高很多，因为真实物体纹理独一无二。
 
-### Day 20 (2026-07-22) — 模块 9 概念 C：Pipeline 设计
+### Day 22 (2026-07-27) — 模块 10 概念 A：ORB 特征检测
 
 **完成事项：**
-- [x] 7 步检测 Pipeline 骨架：load_image / to_grayscale / apply_blur / detect_edges / morph_close / find_contours / compute_properties + classify_shape
-- [x] draw_annotations：轮廓着色 + 轴对齐包围盒 + 质心标签（ID / 面积 / 形状）
-- [x] get_color_palette：HSV 色相均匀采样 → BGR 元组（内联实现，消除 Day 17 导入依赖）
-- [x] build_debug_grid：2×3 流水线中间结果可视化（Load / Gray / Blur / Canny / Morph / Annotated）
-- [x] run_pipeline：7 步串联 + 异常保护 + steps/ 中间结果分包保存
-- [x] main：合成图 type_test.png + 真实照片 IMG_0701.png / IMG_0705.png 三图验证
-- [x] 视频帧验证：从 rgb_79c1787d6c.mp4 随机抽 4 帧 → 全部跑通（11 / 5 / 112 / 68 / 30 / 38 / 35 物体）
-- [x] save_json_report：多图结果汇总 JSON 输出
-- [x] 空轮廓保护 + FileNotFoundError 升级 + m00=0 除零保护
+- [x] 费曼拆解：特征点（Keypoint）= 图中"有辨识度"的位置，描述子（Descriptor）= 该位置的 256-bit 数字指纹
+- [x] make_synthetic_texture：棋盘格 + 三个几何形状（矩形/圆形/三角形）的灰度合成图
+- [x] detect_keypoints：ORB_create → detectAndCompute 完整管线
+- [x] draw_rich_keypoints：DRAW_RICH_KEYPOINTS 标志显示方向和大小
+- [x] compute_density_map：8×8 网格逐格统计特征点密度
+- [x] draw_density_heatmap：COLORMAP_JET 归一化 → addWeighted 叠加原图
+- [x] build_comparison_panel：2×3 对比图（上行 Rich Keypoints / 下行密度热力图）
+- [x] print_summary：三组 nfeatures 的检出数 / avg response / avg size 终端输出
+- [x] answer_question：分析"特征点越多越好吗？"——基于 avg response 趋势给出 trade-off 结论
+- [x] 合成图跑通：nfeatures=100→81pts / 500→373pts / 2000→986pts
+- [x] 对比图保存至 data/processed/day_22_orb_comparison.png
 
 **关键发现：**
-- 流水线的 7 步顺序有严格依赖：必须先 blur 降噪再 Canny，否则噪声边缘泛滥；必须先 morph 闭合断裂边再 findContours，否则一条轮廓断成好几段
-- 视频帧 (1920×1440 @60fps) 需用 max_size=1200 降采样——全分辨率下轮廓数量陡增但大部分是背景纹理
-- 形状分类基于 approxPolyDP 顶点数：3→Triangle / 4→Rectangle / ≥8→Circle，但真实场景中许多 "Circle" 的 circularity 仅 0.01~0.14——需后续用 circularity 二次校验
+- 合成图（棋盘格 40px/block）上 ORB 的角点集中在棋盘格交点和形状边缘——纯色区域无特征
+- nfeatures=100 只检出 81 个点（上限没到，说明合成图上的强角点有限）
+- nfeatures=2000 检出 986 个点后 avg size 从 60.5→70.8（尺度假性增大，覆盖更多弱纹理区域）
+- 从像素操作到语义理解的跨越：ORB 让程序能"认出"跨图的同一位置——这是帧间追踪的基础
 
 **复盘三问：**
-1. Pipeline 的每一步是否可以互换顺序？大部分不行。顺序是：去噪（Blur）→ 边缘（Canny）→ 闭合（Morph）→ 轮廓（Contours）。调换 blur 和 Canny 会多出无数假边缘；去掉 morph 会导致断裂轮廓无法被完整检出。
-2. run_pipeline 的接口设计有什么取舍？每步都保存中间结果到文件——方便调试但增加 I/O。最终项目版应该给一个 debug=False 参数跳过中间保存，只保留最终输出。
-3. 今天 Pipeline 的架构和最终项目的关系？架构完全一致：帧提取 → 预处理 → 特征提取 → 结构化输出。今天用 Canny+Contours 作为"特征"，最终项目替换成 ROI 分窗 + 帧间追踪即可。
+1. 特征点和之前学的轮廓（findContours）有什么本质不同？轮廓是"物体边界上的连续点集"（几何形状），特征点是"局部纹理独特的离散位置"（语义地标）。轮廓描述"形状"，特征点描述"身份"。
+2. 为什么 ORB 比 SIFT 更适合入门学习？ORB 免费开源、速度快（二进制描述子+汉明距离）、API 简洁（一行 detectAndCompute）。SIFT 有专利限制且计算量大，对 30 天课程来说工程代价过高。
+3. 特征检测和最终项目的关系？最终项目的"帧间物体追踪"核心就是：第 N 帧检测特征点 → 第 N+1 帧匹配特征点 → 计算物体偏移量。今天学的 ORB 是追踪引擎的"传感器"。
 
 ### Day 21 (2026-07-23) — 阶段测试 3（Week 3 综合）
 
@@ -185,118 +209,94 @@
 2. filter-branch 和 rebase 什么区别？rebase 逐个重放 commit 适合小规模修历史；filter-branch 批处理适合一次改全部 commit 的作者。但两者都重写 hash，push 需要 force。
 3. 今天学到的跟最终项目的关系？代码质量直接决定 Pipeline 在真实视频流上的稳定性。一道除零防护在单张图上无所谓，在 10 万帧视频上就是必现崩溃。
 
-### Day 22 (2026-07-27) — 模块 10 概念 A：ORB 特征检测
+### Day 20 (2026-07-22) — 模块 9 概念 C：Pipeline 设计
 
 **完成事项：**
-- [x] 费曼拆解：特征点（Keypoint）= 图中"有辨识度"的位置，描述子（Descriptor）= 该位置的 256-bit 数字指纹
-- [x] make_synthetic_texture：棋盘格 + 三个几何形状（矩形/圆形/三角形）的灰度合成图
-- [x] detect_keypoints：ORB_create → detectAndCompute 完整管线
-- [x] draw_rich_keypoints：DRAW_RICH_KEYPOINTS 标志显示方向和大小
-- [x] compute_density_map：8×8 网格逐格统计特征点密度
-- [x] draw_density_heatmap：COLORMAP_JET 归一化 → addWeighted 叠加原图
-- [x] build_comparison_panel：2×3 对比图（上行 Rich Keypoints / 下行密度热力图）
-- [x] print_summary：三组 nfeatures 的检出数 / avg response / avg size 终端输出
-- [x] answer_question：分析"特征点越多越好吗？"——基于 avg response 趋势给出 trade-off 结论
-- [x] 合成图跑通：nfeatures=100→81pts / 500→373pts / 2000→986pts
-- [x] 对比图保存至 data/processed/day_22_orb_comparison.png
+- [x] 7 步检测 Pipeline 骨架：load_image / to_grayscale / apply_blur / detect_edges / morph_close / find_contours / compute_properties + classify_shape
+- [x] draw_annotations：轮廓着色 + 轴对齐包围盒 + 质心标签（ID / 面积 / 形状）
+- [x] get_color_palette：HSV 色相均匀采样 → BGR 元组（内联实现，消除 Day 17 导入依赖）
+- [x] build_debug_grid：2×3 流水线中间结果可视化（Load / Gray / Blur / Canny / Morph / Annotated）
+- [x] run_pipeline：7 步串联 + 异常保护 + steps/ 中间结果分包保存
+- [x] main：合成图 type_test.png + 真实照片 IMG_0701.png / IMG_0705.png 三图验证
+- [x] 视频帧验证：从 rgb_79c1787d6c.mp4 随机抽 4 帧 → 全部跑通（11 / 5 / 112 / 68 / 30 / 38 / 35 物体）
+- [x] save_json_report：多图结果汇总 JSON 输出
+- [x] 空轮廓保护 + FileNotFoundError 升级 + m00=0 除零保护
 
 **关键发现：**
-- 合成图（棋盘格 40px/block）上 ORB 的角点集中在棋盘格交点和形状边缘——纯色区域无特征
-- nfeatures=100 只检出 81 个点（上限没到，说明合成图上的强角点有限）
-- nfeatures=2000 检出 986 个点后 avg size 从 60.5→70.8（尺度假性增大，覆盖更多弱纹理区域）
-- 从像素操作到语义理解的跨越：ORB 让程序能"认出"跨图的同一位置——这是帧间追踪的基础
+- 流水线的 7 步顺序有严格依赖：必须先 blur 降噪再 Canny，否则噪声边缘泛滥；必须先 morph 闭合断裂边再 findContours，否则一条轮廓断成好几段
+- 视频帧 (1920×1440 @60fps) 需用 max_size=1200 降采样——全分辨率下轮廓数量陡增但大部分是背景纹理
+- 形状分类基于 approxPolyDP 顶点数：3→Triangle / 4→Rectangle / ≥8→Circle，但真实场景中许多 "Circle" 的 circularity 仅 0.01~0.14——需后续用 circularity 二次校验
 
 **复盘三问：**
-1. 特征点和之前学的轮廓（findContours）有什么本质不同？轮廓是"物体边界上的连续点集"（几何形状），特征点是"局部纹理独特的离散位置"（语义地标）。轮廓描述"形状"，特征点描述"身份"。
-2. 为什么 ORB 比 SIFT 更适合入门学习？ORB 免费开源、速度快（二进制描述子+汉明距离）、API 简洁（一行 detectAndCompute）。SIFT 有专利限制且计算量大，对 30 天课程来说工程代价过高。
-3. 特征检测和最终项目的关系？最终项目的"帧间物体追踪"核心就是：第 N 帧检测特征点 → 第 N+1 帧匹配特征点 → 计算物体偏移量。今天学的 ORB 是追踪引擎的"传感器"。
+1. Pipeline 的每一步是否可以互换顺序？大部分不行。顺序是：去噪（Blur）→ 边缘（Canny）→ 闭合（Morph）→ 轮廓（Contours）。调换 blur 和 Canny 会多出无数假边缘；去掉 morph 会导致断裂轮廓无法被完整检出。
+2. run_pipeline 的接口设计有什么取舍？每步都保存中间结果到文件——方便调试但增加 I/O。最终项目版应该给一个 debug=False 参数跳过中间保存，只保留最终输出。
+3. 今天 Pipeline 的架构和最终项目的关系？架构完全一致：帧提取 → 预处理 → 特征提取 → 结构化输出。今天用 Canny+Contours 作为"特征"，最终项目替换成 ROI 分窗 + 帧间追踪即可。
 
-### Day 23 (2026-07-28) — 模块 10 概念 B+C：ORB 特征匹配 + Ratio Test + RANSAC
+### Day 19 (2026-07-17) — 模块 9 概念 A+B：霍夫直线 + 圆检测
 
 **完成事项：**
-- [x] 费曼拆解：Ratio Test = "最像 vs 次像差距大才保留"，RANSAC = "少数服从多数"筛误匹配
-- [x] make_template：复用 generate_texture_image(300,300) 生成模板图
-- [x] make_scene：generate_texture_image(900,600) 背景 + 随机偏移旋转 (0-45°) 嵌入模板，np.where 掩码叠加
-- [x] detect_keypoints：Day 22 函数直接复用
-- [x] match_raw：BFMatcher.match → sorted by distance
-- [x] match_ratio_test：BFMatcher.knnMatch(k=2) → m.distance < 0.75 * n.distance
-- [x] match_ransac：findHomography(RANSAC) → inlier_mask → inlier_ratio
-- [x] draw_keypoints_side_by_side：np.hstack 拼接两张 Rich Keypoints 图
-- [x] draw_matches：cv2.drawMatches 连线可视化
-- [x] draw_object_box：cv2.perspectiveTransform 投影四角 → polylines 绿框 / MATCH FAILED 保护
-- [x] build_comparison_panel：2×2 四阶段对比图（KP / Raw / Ratio / RANSAC）
-- [x] print_match_summary：三步过滤数 + Inlier Ratio + Confidence 四级判定
-- [x] 重构：make_template/make_scene 改用 generate_texture_image 消除重复代码
-- [x] Git push 完成
+- [x] detect_lines：HoughLinesP 直线检测（threshold / minLineLength / maxLineGap 调参）
+- [x] detect_circles：HoughCircles 圆检测（param2 调参 + dp / minDist / minRadius / maxRadius）
+- [x] draw_lines / draw_circles：线段 + 圆周 + 圆心标注
+- [x] sweep_line_threshold：threshold=[30,60,100,150] 1×4 网格对比
+- [x] sweep_circle_param2：param2=[20,30,40,50] 1×4 网格对比
+- [x] build_debug_grid：2×2 灰度/边缘/直线/圆综合展示
+- [x] 合成图 type_test.png：检测到 46 条直线 + 9 个圆（param2=30 偏松，有重复检测）
 
 **关键发现：**
-- 合成图匹配结果：Raw=198 → Ratio=23 → RANSAC=4 (17.4% inlier) → Low confidence
-- Ratio Test 保留率仅 11.6%——棋盘格纹理高度重复，BFMatcher 无法区分"哪个角点匹配哪个角点"
-- 4 个内点刚好画出绿色框，但内点率 17.4% 低于模块验收标准的 20%
-- 根因分析：生成式纹理（棋盘格）的特征点彼此相似，不像真实物体（书封面/logo）有独一无二的纹理
-- np.where(mask, tpl, roi) 替代 cv2.addWeighted + 布尔索引，兼容 NumPy 2
+- 霍夫直线 vs 轮廓法的本质区别：投票 vs 追踪——前者用参数空间投票找出"最可能存在的几何形状"，后者用连通组件追踪"实际的闭合边界"
+- param2=30 检测 9 个圆但包含重复检测（同一个圆被不同半径检测多次），param2=50 会漏检——trade-off 是调参核心
+- HoughCircles 输入是灰度图（非边缘图），内部自建 Canny——而 HoughLinesP 输入是边缘图
+- 46 条直线中部分线段是连接矩形和三角形的边界线，threshold=60 较好地平衡了"不漏主线"和"不捡噪点"
 
 **复盘三问：**
-1. Ratio Test 的 0.75 这个值怎么来的？Lowe 在 SIFT 论文中提出的经验值。0.75 意味着最近邻距离必须比次近邻小 25% 以上才可信。棋盘格角点的最近邻和次近邻距离几乎相等（因为角点都长得像），所以大量被筛掉。
-2. RANSAC 为什么需要至少 4 对点？单应矩阵 H 是 3×3 有 8 个自由度（右下角归一化为 1），每对点提供 2 个方程（x 和 y），4×2=8 刚好够解。3 对点只有 6 个方程，欠定。
-3. 特征匹配和最终项目的关系？帧间追踪的核心就是跨帧匹配——当前帧的特征点去下一帧找匹配。今天的实验是单次匹配，项目需要变成循环匹配（每帧匹配上一帧）。内点率 17.4% 在真实场景中会高很多，因为真实物体纹理独一无二。
+1. 霍夫直线和轮廓法检测直线的方式有什么不同？轮廓法先找闭合边界再 approxPolyDP 判断边数——前提是直线必须构成封闭图形的边。霍夫直接检测任意方向的非闭合线段——只要边缘点在投票空间中有足够多的共线点。前者"找形状"，后者"找直线"。
+2. threshold 在 Hough 和 Canny 中的含义有何区别？Canny 的 threshold 是梯度强度阈值（滞后连接用的）；Hough 的 threshold 是最少投票数（最少有多少个像素共线才算直线）。同名不同义。
+3. 霍夫检测和最终项目的关系？最终项目的"帧间物体追踪"环节中，如果场景中有直线特征（如桌面边缘、工件边界），霍夫直线可以作为特征点的补充线索——结合轮廓的质心追踪和霍夫的直线追踪提供更鲁棒的帧间对齐。
 
-### Day 24 (2026-07-31) — 模块 11 概念 A：视频 I/O
+### Day 18 (2026-07-16) — 模块 8 概念 B+C：轮廓几何属性 + 形状分类
 
 **完成事项：**
-- [x] get_video_metadata：fps / frame_count / width / height / fourcc（位运算解码成 4 字符）
-- [x] print_metadata：补全 fps + frame_count，docstring 与实现一致
-- [x] annotate_frame：帧号 + 时间戳 putText 标注（frame=00000 t=0.000s）
-- [x] extract_and_annotate：每 5 帧抽取 + 标注 + 存 PNG + 单趟写视频（源速 60fps）
-- [x] 8 项修复计划全部完成（#1-#8）
-- [x] 单趟重构：合并抽帧与组装，内存 O(N) → O(1)（Max RSS 3.2GB → 290MB）
-- [x] 全程 ruff lint/format 全绿 + 安全提交流程固化到 CLAUDE.md
-- [x] Git push 完成
-
-**错误分析：**
-- A：`saved += 1` 缩进放错层级——放在 `if frame_idx % SAMPLE_INTERVAL` 外，每帧都计数（1837 而非 368）。计数必须和"是否采样"同一分支
-- 流程：临时 index 提交未先 read-tree HEAD，把整个仓库提交成"删除 51 个文件"——用 read-tree HEAD 修复，并固化安全流程到 CLAUDE.md
-- 环境：/mnt/d 幽灵 index.lock（9p loose cache），rm/sync 无法根治，安全流程可稳定绕开
+- [x] compute_properties：area / arcLength / moments 质心 / boundingRect / minAreaRect / circularity / aspect_ratio
+- [x] m00 零保护 + minAreaRect 三层解包陷阱修复
+- [x] classify_shape：approxPolyDP 四种形状分类（Triangle / Rectangle / Circle / Irregular）
+- [x] draw_boxes：轴对齐矩形（蓝）+ 旋转矩形（绿）双层叠加 + 形状标签
+- [x] save_csv：csv.DictWriter 输出属性表（float 四舍五入到 2 位小数）
+- [x] build_debug_grid：Panel 4 读取 CSV 并渲染为 monospace 文本表格
+- [x] main() 串联完整 Pipeline：合成图 9 个物体全部检出
 
 **关键发现：**
-- 元数据语义：meta["width"] 是"源的声明尺寸"，frame.shape 是"实际帧尺寸"——resize 后两者分叉，VideoWriter 尺寸必须跟实际帧走
-- 两趟式 vs 单趟式：内存 O(N)→O(1)，时间不变（总工作量相同）——单趟是"演示脚本"到"数据管道"的分水岭，管道能跑任意长度视频
-- 输出视频改源速后，播放进度与标注时间戳一致
+- minAreaRect 返回嵌套三层元组 `((cx,cy),(w,h),angle)`，不是 5 个独立值——Day 18 踩坑
+- 合成图（type_test.png）上 9 个物体检出结果：3 Triangle / 2 Rectangle / 2 Circle / 2 Irregular
+- 圆度理论值：完美圆=1.0，正方形≈0.785，长条矩形圆度远低于 0.6
+- 六角星被 approxPolyDP(epsilon=0.02) 压成 3 个顶点→归类为 Triangle，是 epsilon 过大的典型误分类
 
 **复盘三问：**
-1. meta 尺寸和 frame.shape 什么时候会不一致？抽帧时加了 resize/变换。meta 是编解码器"声明"，shape 是解码后的"实物"——写视频必须按实物尺寸。
-2. 为什么单趟式内存大降而时间不变？总工作量（解码+标注+编码）没变，只是把"攒满列表再消费"改成"边读边写"，驻留从 N 帧变 1 帧。
-3. 和最终项目的关系？MP4→结构化数据管道必须能处理任意长度视频——单趟流式是基础；VideoCapture 是管道入口（读帧），VideoWriter 是出口（可视化输出）。
+1. compute_properties 为什么写 `moments(cnt)` 而不是逐个算？图像矩一次调用能拿到所有矩值（m00、m10、m01…），避免重复遍历轮廓。一次调用、字典取值——更快也更干净。
+2. minAreaRect 的三层嵌套怎么解？用 `((cx, cy), (w, h), angle)` 解包，这是最直接的方式。也可以用下标 `rect[0][0]`，但可读性差。
+3. approxPolyDP 的形状分类在什么条件下会失效？物体被遮挡导致轮廓残缺，或者透视变形导致矩形成梯形→approx 顶点数变 4 以上→被分错类。epsilon 的 0.02 经验值也需要根据物体大小微调。
 
-### Day 25 (2026-08-04) — 模块 11 概念 B：帧差法运动检测 + 背景减除
+### Day 17 (2026-07-14) — 模块 8 概念 A：轮廓提取
 
 **完成事项：**
-- [x] 素材体检：滚动球.mp4（1080p/30fps/23s/690 帧）逐像素 std 分析 → 99.3% 像素随时间变化（相机不稳 + 中间手入画）
-- [x] 6 函数实现：init_background_subtractor / process_frame / find_moving_objects / draw_detections / update_trajectories / build_three_panel
-- [x] process_frame：MOG2.apply 三值（0/127/255）→ 阴影 127 必须排除（`==255` 才算前景）→ MORPH_OPEN 清理
-- [x] update_trajectories：贪心最近邻 + 防重用 + preexisting 快照（新轨迹不被误删）
-- [x] 4 处 bug 修复：轨迹 3 处（防重用/迭代删除/新轨迹误删）+ VideoWriter 尺寸 1 处
-- [x] 端到端跑通：552 帧 @24fps 三面板视频（19.5MB）+ 10 张 panel PNG，0 写帧失败
-- [x] 参数调优：27 组扫描（varThreshold×kernel×MIN_AREA）→ MIN_AREA 200→8000、kernel 5→9×9
-- [x] 调参效果：5-10s 基准 mean 4.2→1.0；前 5s 14.7→1.7；10-15s 10.6→2.2；15-23s 22.2→2.5
-- [x] 检测可视化验证：frame 160 绿框（152×114）正确套住球（直径 ~125px）
-- [x] 6 个 commit + push（素材切换 / bug 修复 / lint / 写帧修复 / 参数调优）
+- [x] 骨架搭建：load_image / preprocess / find_objects / draw_labeled_objects / build_debug_grid
+- [x] find_objects：findContours + RETR_EXTERNAL + CHAIN_APPROX_SIMPLE + area 过滤 + 降序排序
+- [x] get_color_palette：HSV 色相均匀采样 → BGR 元组，保证轮廓颜色区分
+- [x] draw_labeled_objects：逐轮廓上色 + cv2.moments 质心 + putText 标注 ID/面积
+- [x] build_debug_grid：2×2 管线中间结果可视化
+- [x] main：PORTABLE 路径 + 真实照片自动缩放 + 全流程接通
+- [x] 空轮廓保护（get_color_palette(0) 不会崩溃）
+- [x] 跑通 IMG_0701.png：找到 10 个物体，面积 769~2,202 px²
 
 **关键发现：**
-- 检测前必须先做素材体检：99.3% 像素随时间变化 = 相机不稳，背景减除会"全屏报警"——这是素材选型的第一道闸
-- 前 5s"看似干净"但 MOG2 仍报 14.7 碎片/帧：根因是 MIN_AREA=200 太松（50% 碎片 <200px），球本体 ~12,400px
-- VideoWriter 用原始帧尺寸初始化、写入三面板尺寸 → FFmpeg 静默丢帧，输出 257 字节空文件；writer 必须按实际写入帧的 shape 初始化
-- mp4v（YUV 4:2:0）要求偶数宽高，面板宽度要对齐到偶数
-
-**错误分析：**
-- A：update_trajectories 新 spawn 的轨迹不在 matched_trails 里，被删除循环当"过期轨迹"误删——需 preexisting 快照区分"本帧前已存在的轨迹"
-- K：VideoWriter 尺寸 ≠ 实际写入帧尺寸（与 Day 24 的 meta 声明 vs shape 实物同源，这次是 writer 初始化对象选错）
-- C：迭代 `trails.keys()` 时 del → `RuntimeError: dictionary changed size during iteration`，应先 `list(keys())` 快照
+- Canny 边缘占比 2.3%，阈值 (50, 150) 对桌面场景适中——没有过度噪点也没漏主要轮廓
+- CHAIN_APPROX_SIMPLE 压缩后轮廓点数大幅减少，但 contourArea 精度不受影响
+- 路径写死 vs SCRIPT_DIR/PROJECT_DIR 可移植性差异明显——后者在 VM 和本地之间自动适配
 
 **复盘三问：**
-1. 帧差法 vs MOG2 的本质区别？帧差法比较相邻两帧，只捕捉"相邻时刻的变化"（物体静止即消失）；MOG2 为每像素建高斯混合背景模型，容忍缓慢光照变化，物体静止仍能报出。两者都要求相机固定。
-2. 为什么"高架车流"比滚动球视频更适合背景减除？高架监控相机固定（满足硬门槛）、背景路面统一。但车多引入遮挡、blob 合并、阴影、速度超匹配距离四个新难点——"目标多"是新的复杂度，不是简单的"更好"。
-3. 和最终项目的关系？MOG2 前景 mask + 轨迹关联就是"帧间物体追踪"的原型；素材体检（先验证相机稳定）是数据管道第一步——坏素材要提前识别，否则下游全输出垃圾。
+1. findContours 返回的是坐标列表还是二值图？坐标列表。每个轮廓是一组 `(x, y)` 点，不是像素掩码。这是"图像处理"和"图像分析"的分水岭。
+2. RETR_EXTERNAL vs RETR_TREE 什么时候用？只数物体个数→EXTERNAL；需要知道物体嵌套关系（如在框里的文字）→TREE。
+3. 轮廓 Pipeline 和最终项目的关系？数物体+算属性正是最终项目"多 ROI 分窗分析"的核心：每个 ROI 独立做轮廓提取和特征计算。
 
 ### Day 15 (2026-06-29) — 模块 7 概念 A：三种二值化策略 + BINARY vs BINARY_INV
 
