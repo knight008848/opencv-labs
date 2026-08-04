@@ -46,7 +46,7 @@ def init_background_subtractor() -> cv2.BackgroundSubtractorMOG2:
     # ── Your implementation here ──
     # Hint:
     #   return cv2.createBackgroundSubtractorMOG2(history=500, varThreshold=16, detectShadows=True)
-    pass
+    return cv2.createBackgroundSubtractorMOG2(history=500, varThreshold=16, detectShadows=True)
 
 
 def process_frame(
@@ -63,7 +63,10 @@ def process_frame(
     #   fg = (raw == 255).astype(np.uint8) * 255    # keep only true foreground
     #   clean = cv2.morphologyEx(fg, cv2.MORPH_OPEN, kernel)   # erode + dilate
     #   return fg, clean
-    pass
+    raw = bg_sub.apply(frame)
+    fg = (raw == 255).astype(np.uint8) * 255
+    clean = cv2.morphologyEx(fg, cv2.MORPH_OPEN, kernel)
+    return fg, clean
 
 
 def find_moving_objects(fg_mask_clean: np.ndarray, min_area: int) -> list[dict]:
@@ -78,7 +81,16 @@ def find_moving_objects(fg_mask_clean: np.ndarray, min_area: int) -> list[dict]:
     #       M = cv2.moments(cnt)                 # guard M["m00"] == 0
     #       centroid = (int(M["m10"]/M["m00"]), int(M["m01"]/M["m00"]))
     #       bbox = cv2.boundingRect(cnt)
-    pass
+    cnts = cv2.findContours(fg_mask_clean, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]
+    objects = []
+    for cnt in cnts:
+        if cv2.contourArea(cnt) >= min_area:
+            M = cv2.moments(cnt)
+            if M["m00"] != 0:
+                centroid = (int(M["m10"]/M["m00"]), int(M["m01"]/M["m00"]))
+                bbox = cv2.boundingRect(cnt)
+                objects.append({"bbox": bbox, "centroid": centroid})
+    return objects
 
 
 def draw_detections(frame: np.ndarray, objects: list[dict]) -> np.ndarray:
@@ -92,7 +104,12 @@ def draw_detections(frame: np.ndarray, objects: list[dict]) -> np.ndarray:
     #       x, y, w, h = obj["bbox"]; cx, cy = obj["centroid"]
     #       cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
     #       cv2.circle(frame, (cx, cy), 4, (0, 0, 255), -1)
-    pass
+    for obj in objects:
+        x, y, w, h = obj["bbox"]; cx, cy = obj["centroid"]
+        cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+        cv2.circle(frame, (cx, cy), 4, (0, 0, 255), -1)
+
+    return frame
 
 
 def update_trajectories(
@@ -120,7 +137,32 @@ def update_trajectories(
     #   4. Unmatched centroid -> trails[next_id] = [centroid]; next_id += 1.
     #   5. Delete any trail that got no match this frame.
     #   Return (trails, next_id).
-    pass
+    
+    matched_trails = set()
+    for obj in objects:
+        cx, cy = obj["centroid"]
+        min_dist = float("inf")
+        min_trail = None
+        for trail_id, trail in trails.items():
+            if len(trail) == 0:
+                continue
+            last_pt = trail[-1]
+            dist = np.linalg.norm(np.array((cx, cy)) - np.array(last_pt))
+            if dist < min_dist:
+                min_dist = dist
+                min_trail = trail_id
+        if min_dist <= max_dist:
+            matched_trails.add(min_trail)
+            trails[min_trail].append((cx, cy))
+            trails[min_trail] = trails[min_trail][-max_len:]
+        else:
+            trails[next_id] = [(cx, cy)]
+            next_id += 1
+    for trail_id in trails.keys():
+        if trail_id not in matched_trails:
+            del trails[trail_id]
+    return trails, next_id
+
 
 
 def draw_trajectories(frame: np.ndarray, trails: dict[int, list[tuple[int, int]]]) -> np.ndarray:
@@ -133,7 +175,12 @@ def draw_trajectories(frame: np.ndarray, trails: dict[int, list[tuple[int, int]]
     #   for pts in trails.values():
     #       if len(pts) >= 2:
     #           cv2.polylines(frame, [np.array(pts)], isClosed=False, color=(255, 0, 0), thickness=2)
-    pass
+    for pts in trails.values():
+        if len(pts) >= 2:
+            cv2.polylines(frame, [np.array(pts)], isClosed=False, color=(255, 0, 0), thickness=2)
+
+
+    return frame    
 
 
 def build_three_panel(original: np.ndarray, fg_mask_clean: np.ndarray, detection: np.ndarray) -> np.ndarray:
@@ -149,7 +196,17 @@ def build_three_panel(original: np.ndarray, fg_mask_clean: np.ndarray, detection
     #   mask_bgr = cv2.cvtColor(to_panel(fg_mask_clean), cv2.COLOR_GRAY2BGR)
     #   label each panel ("source" / "mask" / "detection")
     #   return np.hstack([src_panel, mask_bgr, det_panel])
-    pass
+    height = 480
+    to_panel = lambda img: cv2.resize(img, (..., height))
+    src_panel = to_panel(original)
+    mask_bgr = cv2.cvtColor(to_panel(fg_mask_clean), cv2.COLOR_GRAY2BGR)
+    det_panel = to_panel(detection)
+    cv2.putText(src_panel, "source", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 2)
+    cv2.putText(mask_bgr, "mask", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 2)
+    cv2.putText(det_panel, "detection", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 2)
+
+
+    return np.hstack([src_panel, mask_bgr, det_panel])
 
 
 def main() -> None:
