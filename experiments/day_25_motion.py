@@ -139,12 +139,15 @@ def update_trajectories(
     #   5. Delete any trail that got no match this frame.
     #   Return (trails, next_id).
     
+    preexisting = set(trails.keys())  # trails that existed before this frame
     matched_trails = set()
     for obj in objects:
         cx, cy = obj["centroid"]
         min_dist = float("inf")
         min_trail = None
         for trail_id, trail in trails.items():
+            if trail_id in matched_trails:
+                continue  # one trail may match at most one object this frame
             if len(trail) == 0:
                 continue
             last_pt = trail[-1]
@@ -159,8 +162,8 @@ def update_trajectories(
         else:
             trails[next_id] = [(cx, cy)]
             next_id += 1
-    for trail_id in trails.keys():
-        if trail_id not in matched_trails:
+    for trail_id in list(trails.keys()):  # snapshot keys before deleting
+        if trail_id not in matched_trails and trail_id in preexisting:
             del trails[trail_id]
     return trails, next_id
 
@@ -198,7 +201,12 @@ def build_three_panel(original: np.ndarray, fg_mask_clean: np.ndarray, detection
     #   label each panel ("source" / "mask" / "detection")
     #   return np.hstack([src_panel, mask_bgr, det_panel])
     height = 480
-    to_panel = lambda img: cv2.resize(img, (..., height))
+    width = int(original.shape[1] * height / original.shape[0])
+
+    def to_panel(img: np.ndarray) -> np.ndarray:
+        """Resize any input panel to the common output size."""
+        return cv2.resize(img, (width, height))
+
     src_panel = to_panel(original)
     mask_bgr = cv2.cvtColor(to_panel(fg_mask_clean), cv2.COLOR_GRAY2BGR)
     det_panel = to_panel(detection)
