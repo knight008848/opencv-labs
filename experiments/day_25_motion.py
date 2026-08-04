@@ -31,11 +31,11 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 # is in view — that failure mode is exactly what today's exercise explores.
 VIDEO_PATH = PROJECT_DIR / "data" / "raw" / "滚动球.mp4"
 
-OUTPUT_FPS = 24.0     # pinned output frame rate (same convention as day 24)
-MIN_AREA = 200        # drop contours smaller than this (speckle noise filter)
-TRAIL_LENGTH = 30     # keep the last N centroids per tracked object
-MAX_MATCH_DIST = 60   # centroids farther apart than this are not the same object
-SAVE_EVERY = 60       # export one sample three-panel PNG every N output frames
+OUTPUT_FPS = 24.0  # pinned output frame rate (same convention as day 24)
+MIN_AREA = 200  # drop contours smaller than this (speckle noise filter)
+TRAIL_LENGTH = 30  # keep the last N centroids per tracked object
+MAX_MATCH_DIST = 60  # centroids farther apart than this are not the same object
+SAVE_EVERY = 60  # export one sample three-panel PNG every N output frames
 
 
 def init_background_subtractor() -> cv2.BackgroundSubtractorMOG2:
@@ -88,7 +88,7 @@ def find_moving_objects(fg_mask_clean: np.ndarray, min_area: int) -> list[dict]:
         if cv2.contourArea(cnt) >= min_area:
             M = cv2.moments(cnt)
             if M["m00"] != 0:
-                centroid = (int(M["m10"]/M["m00"]), int(M["m01"]/M["m00"]))
+                centroid = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
                 bbox = cv2.boundingRect(cnt)
                 objects.append({"bbox": bbox, "centroid": centroid})
     return objects
@@ -106,7 +106,8 @@ def draw_detections(frame: np.ndarray, objects: list[dict]) -> np.ndarray:
     #       cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
     #       cv2.circle(frame, (cx, cy), 4, (0, 0, 255), -1)
     for obj in objects:
-        x, y, w, h = obj["bbox"]; cx, cy = obj["centroid"]
+        x, y, w, h = obj["bbox"]
+        cx, cy = obj["centroid"]
         cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
         cv2.circle(frame, (cx, cy), 4, (0, 0, 255), -1)
 
@@ -138,7 +139,7 @@ def update_trajectories(
     #   4. Unmatched centroid -> trails[next_id] = [centroid]; next_id += 1.
     #   5. Delete any trail that got no match this frame.
     #   Return (trails, next_id).
-    
+
     preexisting = set(trails.keys())  # trails that existed before this frame
     matched_trails = set()
     for obj in objects:
@@ -168,7 +169,6 @@ def update_trajectories(
     return trails, next_id
 
 
-
 def draw_trajectories(frame: np.ndarray, trails: dict[int, list[tuple[int, int]]]) -> np.ndarray:
     """
     Draw each trail as connected line segments.
@@ -183,11 +183,12 @@ def draw_trajectories(frame: np.ndarray, trails: dict[int, list[tuple[int, int]]
         if len(pts) >= 2:
             cv2.polylines(frame, [np.array(pts)], isClosed=False, color=(255, 0, 0), thickness=2)
 
+    return frame
 
-    return frame    
 
-
-def build_three_panel(original: np.ndarray, fg_mask_clean: np.ndarray, detection: np.ndarray) -> np.ndarray:
+def build_three_panel(
+    original: np.ndarray, fg_mask_clean: np.ndarray, detection: np.ndarray
+) -> np.ndarray:
     """
     Stack three same-size panels horizontally: original | mask | detection.
     Resize each panel to a common height first so the output is manageable;
@@ -214,7 +215,6 @@ def build_three_panel(original: np.ndarray, fg_mask_clean: np.ndarray, detection
     cv2.putText(mask_bgr, "mask", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 2)
     cv2.putText(det_panel, "detection", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 2)
 
-
     return np.hstack([src_panel, mask_bgr, det_panel])
 
 
@@ -235,7 +235,7 @@ def main() -> None:
     if not cap.isOpened():
         raise RuntimeError(f"Failed to open video: {VIDEO_PATH}")
     src_fps = cap.get(cv2.CAP_PROP_FPS)
-    ratio = src_fps / OUTPUT_FPS              # source frames per output frame
+    ratio = src_fps / OUTPUT_FPS  # source frames per output frame
 
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     out_video = PROJECT_DIR / "data" / "processed" / "day_25_annotated.mp4"
@@ -247,9 +247,9 @@ def main() -> None:
     next_id = 0
     writer = None
 
-    frame_idx = 0         # source frame index
+    frame_idx = 0  # source frame index
     saved = 0
-    next_target = 0       # next source frame to keep (real-time 24 fps grid)
+    next_target = 0  # next source frame to keep (real-time 24 fps grid)
     start = time.perf_counter()
     try:
         while True:
