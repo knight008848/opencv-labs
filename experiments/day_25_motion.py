@@ -203,6 +203,7 @@ def build_three_panel(
     #   return np.hstack([src_panel, mask_bgr, det_panel])
     height = 480
     width = int(original.shape[1] * height / original.shape[0])
+    width -= width % 2  # mp4v (YUV 4:2:0) rejects odd frame widths
 
     def to_panel(img: np.ndarray) -> np.ndarray:
         """Resize any input panel to the common output size."""
@@ -257,11 +258,6 @@ def main() -> None:
             if not ret:
                 break
             if frame_idx == next_target:
-                if writer is None:
-                    h, w = frame.shape[:2]
-                    writer = cv2.VideoWriter(str(out_video), fourcc, OUTPUT_FPS, (w, h))
-                    if not writer.isOpened():
-                        raise RuntimeError(f"Failed to open writer: {out_video}")
                 fg_raw, fg_clean = process_frame(frame, bg_sub, kernel)
                 objects = find_moving_objects(fg_clean, MIN_AREA)
                 detection = draw_detections(frame.copy(), objects)
@@ -270,6 +266,12 @@ def main() -> None:
                 )
                 detection = draw_trajectories(detection, trails)
                 panel = build_three_panel(frame, fg_clean, detection)
+                if writer is None:
+                    # writer size must match the three-panel layout, not the raw frame
+                    h, w = panel.shape[:2]
+                    writer = cv2.VideoWriter(str(out_video), fourcc, OUTPUT_FPS, (w, h))
+                    if not writer.isOpened():
+                        raise RuntimeError(f"Failed to open writer: {out_video}")
                 writer.write(panel)
                 if saved % SAVE_EVERY == 0:
                     cv2.imwrite(str(OUTPUT_DIR / f"panel_{frame_idx:06d}.png"), panel)
