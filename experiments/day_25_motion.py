@@ -25,10 +25,11 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # ──────────────────────────── Config ────────────────────────────
 
-# ⚠️  Replace with your re-shot clip: fixed camera + one clearly moving object.
-#     The default source below has a MOVING CAMERA — the foreground mask will
-#     flood with the whole frame. It is only a "bad case" to test the pipeline.
-VIDEO_PATH = PROJECT_DIR / "data" / "raw" / "rgb_79c1787d6c.mp4"
+# Rolling-ball clip: one ball + an occasional hand in the middle of the video.
+# The camera is not fully static (per-pixel std analysis shows ~99% of pixels
+# vary over time), so the foreground mask is expected to flood while the hand
+# is in view — that failure mode is exactly what today's exercise explores.
+VIDEO_PATH = PROJECT_DIR / "data" / "raw" / "滚动球.mp4"
 
 OUTPUT_FPS = 24.0     # pinned output frame rate (same convention as day 24)
 MIN_AREA = 200        # drop contours smaller than this (speckle noise filter)
