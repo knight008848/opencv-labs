@@ -32,7 +32,9 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 VIDEO_PATH = PROJECT_DIR / "data" / "raw" / "滚动球.mp4"
 
 OUTPUT_FPS = 24.0  # pinned output frame rate (same convention as day 24)
-MIN_AREA = 200  # drop contours smaller than this (speckle noise filter)
+MIN_AREA = 8000  # foreground blobs below this area are dropped; tuned so the
+# ball (~12k px, median of the largest blob per frame in the 5-10 s window)
+# survives while 50% of sub-200 px speckles are killed
 TRAIL_LENGTH = 30  # keep the last N centroids per tracked object
 MAX_MATCH_DIST = 60  # centroids farther apart than this are not the same object
 SAVE_EVERY = 60  # export one sample three-panel PNG every N output frames
@@ -242,7 +244,7 @@ def main() -> None:
     out_video = PROJECT_DIR / "data" / "processed" / "day_25_annotated.mp4"
 
     bg_sub = init_background_subtractor()
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))
 
     trails: dict[int, list[tuple[int, int]]] = {}
     next_id = 0
