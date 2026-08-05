@@ -60,13 +60,6 @@ def define_roi_config(width: int, height: int) -> dict[str, tuple[int, int, int,
     All extents are computed as fractions of the frame size, so the same
     config works for any resolution.
     """
-    # ── Your implementation here ──
-    # Hint: fractional math on width/height, then round() to int.
-    #   x, y are the top-left corner; w, h are the window extents.
-    #   e.g. work_area: x = round(0.2 * width),  w = round(0.6 * width)
-    #                  y = round(0.2 * height), h = round(0.6 * height)
-    #   inlet:         x = 0, y = 0, w = round(0.25 * width), h = round(0.25 * height)
-    #   Return a dict keyed by the same names as ROI_COLORS.
     return {
         "panorama": (0, 0, width, height),
         "work_area": (
@@ -123,10 +116,6 @@ def draw_roi_boxes(frame: np.ndarray, roi_config: dict) -> np.ndarray:
     and label each rectangle with its roi name via cv2.putText.
     Returns the annotated frame (mutates the input in place).
     """
-    # ── Your implementation here ──
-    # Hint: cv2.rectangle(frame, (x, y), (x + w, y + h), ROI_COLORS[name], 2)
-    #       then cv2.putText(frame, name, (x + 5, y + 20), FONT_HERSHEY_SIMPLEX,
-    #                        0.7, ROI_COLORS[name], 2)
     for name, (x, y, w, h) in roi_config.items():
         cv2.rectangle(frame, (x, y), (x + w, y + h), ROI_COLORS[name], 2)
         cv2.putText(
@@ -140,11 +129,6 @@ def draw_objects(frame: np.ndarray, objects: list[dict]) -> np.ndarray:
     Draw each detected object as a green bounding box + an "#id" label.
     Returns the annotated frame (mutates the input in place).
     """
-    # ── Your implementation here ──
-    # Hint: for idx, obj in enumerate(objects):
-    #       x, y, w, h = obj["bbox"]
-    #       cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-    #       cv2.putText(frame, f"#{idx}", (x + 2, y - 4), ...)
     for idx, obj in enumerate(objects):
         x, y, w, h = obj["bbox"]
         cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
