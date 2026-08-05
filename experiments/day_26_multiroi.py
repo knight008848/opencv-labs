@@ -141,18 +141,26 @@ def build_four_panel(
     All panels are resized to a common display size, then stacked 2x2.
     Returns the combined BGR image.
     """
-    # ── Your implementation here ──
-    # Hint:
-    #   1. panel0 = draw_roi_boxes(original.copy(), roi_config)
-    #   2. For each (name, objects) in results.items():
-    #        crop = original[y:y+h, x:x+w]          # use roi_config[name]
-    #        panel = draw_objects(crop.copy(), objects)
-    #        cv2.putText(panel, name, (10, 30), ...) # label each ROI panel
-    #   3. Resize all four panels to a common (W, H) so the grid is clean.
-    #      A fixed DISPLAY_W/DISPLAY_H (e.g. 640 x 360) is fine.
-    #   4. top_row = np.hstack([panel0, panel1]); bottom_row = np.hstack([...])
-    #      return np.vstack([top_row, bottom_row])
-    pass  # TODO
+    DISPLAY_W, DISPLAY_H = 640, 360  # common size for all four panels
+
+    def to_display(img: np.ndarray) -> np.ndarray:
+        """Resize any panel to the common display size."""
+        return cv2.resize(img, (DISPLAY_W, DISPLAY_H))
+
+    # Panel 0: original frame with ROI boxes + labels
+    panel0 = draw_roi_boxes(original.copy(), roi_config)
+
+    # Panels 1-3: one annotated analysis per ROI
+    roi_panels = []
+    for name, (x, y, w, h) in roi_config.items():
+        crop = original[y : y + h, x : x + w]
+        panel = draw_objects(crop.copy(), results[name])
+        cv2.putText(panel, name, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, ROI_COLORS[name], 2)
+        roi_panels.append(panel)
+
+    top_row = np.hstack([to_display(panel0), to_display(roi_panels[0])])
+    bottom_row = np.hstack([to_display(roi_panels[1]), to_display(roi_panels[2])])
+    return np.vstack([top_row, bottom_row])
 
 
 def print_results(results: dict[str, list[dict]]) -> None:
@@ -160,10 +168,12 @@ def print_results(results: dict[str, list[dict]]) -> None:
     Print a terminal table: one row per ROI with object count and the list
     of (id, bbox, area) for each detected object.
     """
-    # ── Your implementation here ──
-    # Hint: header line + separator + per-ROI rows via f-strings, e.g.
-    #   f"{name:<10} | {len(objects):<4} | {[(i, o['bbox'], round(o['area'])) for i, o in enumerate(objects)]}"
-    pass  # TODO
+    header = f"{'ROI':<12} | {'count':<5} | objects"
+    print(header)
+    print("-" * len(header))
+    for name, objects in results.items():
+        detail = [(i, o["bbox"], round(o["area"])) for i, o in enumerate(objects)]
+        print(f"{name:<12} | {len(objects):<5} | {detail}")
 
 
 def main() -> None:
