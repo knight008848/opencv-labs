@@ -28,7 +28,11 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 VIDEO_PATH = PROJECT_DIR / "data" / "raw" / "滚动球.mp4"  # adjust if needed
 FRAME_NUMBER = 100  # which source frame to analyze (0-based)
-MIN_AREA = 1500  # drop red blobs below this area inside each ROI
+# Keep blobs >= this fraction of each ROI's own area. A relative threshold
+# suits multi-ROI: ROIs have very different sizes, so an absolute pixel
+# count is arbitrary and frame-dependent (the ball's mask area swings 4-5x
+# under motion blur / partial occlusion).
+MIN_AREA_FRACTION = 0.0015  # 0.15% of the ROI area
 
 # HSV red-color segmentation (matched to the rolling-ball target):
 # hue wraps around 0°, so red needs TWO hue bands (0-10 and 170-180).
@@ -75,18 +79,22 @@ def define_roi_config(width: int, height: int) -> dict[str, tuple[int, int, int,
     }
 
 
-def analyze_roi(roi_frame: np.ndarray, min_area: int) -> list[dict]:
+def analyze_roi(roi_frame: np.ndarray) -> list[dict]:
     """
     Run the standard detection pipeline inside one ROI:
       BGR -> HSV -> red mask (two hue bands) -> morph close/open ->
-      findContours -> area filter.
+      findContours -> area filter (>= MIN_AREA_FRACTION of the ROI area).
     The red-color segmentation is matched to the rolling-ball target:
     the ball is low-contrast in grayscale (its Canny edges fragment and
     merge with the frame border), but it is cleanly isolated by hue.
+    NOTE: this single function must serve ALL ROIs (same logic everywhere).
     Returns a list of {"bbox": (x, y, w, h), "centroid": (cx, cy),
                        "area": float} — one entry per detected object.
-    NOTE: this single function must serve ALL ROIs (same logic everywhere).
+    Known limit: a motion-blurred / heavily occluded ball can shrink below
+    the threshold and be dropped for that frame (single-frame analysis —
+    frame-to-frame tracking is Day 25 territory).
     """
+    min_area = MIN_AREA_FRACTION * roi_frame.shape[0] * roi_frame.shape[1]
     hsv = cv2.cvtColor(roi_frame, cv2.COLOR_BGR2HSV)
     mask = cv2.inRange(hsv, HSV_RED_LOWER_1, HSV_RED_UPPER_1) | cv2.inRange(
         hsv, HSV_RED_LOWER_2, HSV_RED_UPPER_2
@@ -221,7 +229,7 @@ def main() -> None:
     results: dict[str, list[dict]] = {}
     for name, (x, y, rw, rh) in roi_config.items():
         roi_frame = frame[y : y + rh, x : x + rw]
-        results[name] = analyze_roi(roi_frame, MIN_AREA)
+        results[name] = analyze_roi(roi_frame)
     elapsed = time.perf_counter() - start
 
     panel = build_four_panel(frame, roi_config, results)
