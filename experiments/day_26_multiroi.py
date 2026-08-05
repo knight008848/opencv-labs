@@ -28,8 +28,16 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 VIDEO_PATH = PROJECT_DIR / "data" / "raw" / "滚动球.mp4"  # adjust if needed
 FRAME_NUMBER = 100  # which source frame to analyze (0-based)
-MIN_AREA = 200  # drop contours below this area inside each ROI
-CANNY_LOW, CANNY_HIGH = 50, 150  # Canny hysteresis thresholds
+MIN_AREA = 1500  # drop red blobs below this area inside each ROI
+
+# HSV red-color segmentation (matched to the rolling-ball target):
+# hue wraps around 0°, so red needs TWO hue bands (0-10 and 170-180).
+HSV_RED_LOWER_1 = (0, 80, 60)
+HSV_RED_UPPER_1 = (10, 255, 255)
+HSV_RED_LOWER_2 = (170, 80, 60)
+HSV_RED_UPPER_2 = (180, 255, 255)
+CLOSE_KERNEL = 15  # close gaps so the ball disk becomes one solid blob
+OPEN_KERNEL = 3  # drop isolated salt-pixel noise
 
 # ROI name -> draw color (BGR)
 ROI_COLORS = {
@@ -70,33 +78,34 @@ def define_roi_config(width: int, height: int) -> dict[str, tuple[int, int, int,
 def analyze_roi(roi_frame: np.ndarray, min_area: int) -> list[dict]:
     """
     Run the standard detection pipeline inside one ROI:
-      gray -> Gaussian blur -> Canny -> findContours -> area filter.
+      BGR -> HSV -> red mask (two hue bands) -> morph close/open ->
+      findContours -> area filter.
+    The red-color segmentation is matched to the rolling-ball target:
+    the ball is low-contrast in grayscale (its Canny edges fragment and
+    merge with the frame border), but it is cleanly isolated by hue.
     Returns a list of {"bbox": (x, y, w, h), "centroid": (cx, cy),
                        "area": float} — one entry per detected object.
     NOTE: this single function must serve ALL ROIs (same logic everywhere).
     """
-    # ── Your implementation here ──
-    # Hint: reuse the pipeline from Day 20 / Day 25 —
-    #   gray    = cv2.cvtColor(roi_frame, cv2.COLOR_BGR2GRAY)
-    #   blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-    #   edges   = cv2.Canny(blurred, CANNY_LOW, CANNY_HIGH)
-    #   cnts    = cv2.findContours(edges, cv2.RETR_EXTERNAL,
-    #                              cv2.CHAIN_APPROX_SIMPLE)[0]
-    #   for each cnt with area >= min_area:
-    #       bbox = cv2.boundingRect(cnt)
-    #       M = cv2.moments(cnt)          # guard M["m00"] == 0
-    #       centroid = (int(M["m10"]/M["m00"]), int(M["m01"]/M["m00"]))
-    gray = cv2.cvtColor(roi_frame, cv2.COLOR_BGR2GRAY)
-    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-    edges = cv2.Canny(blurred, CANNY_LOW, CANNY_HIGH)
-    cnts = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]
+    hsv = cv2.cvtColor(roi_frame, cv2.COLOR_BGR2HSV)
+    mask = cv2.inRange(hsv, HSV_RED_LOWER_1, HSV_RED_UPPER_1) | cv2.inRange(
+        hsv, HSV_RED_LOWER_2, HSV_RED_UPPER_2
+    )
+    # close gaps so the ball disk is one solid blob, then drop salt noise
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((CLOSE_KERNEL, CLOSE_KERNEL), np.uint8))
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((OPEN_KERNEL, OPEN_KERNEL), np.uint8))
+    cnts = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]
     objects = []
     for cnt in cnts:
-        if cv2.contourArea(cnt) >= min_area:
-            bbox = cv2.boundingRect(cnt)
-            M = cv2.moments(cnt)  # guard M["m00"] == 0
-            centroid = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
-            objects.append({"bbox": bbox, "centroid": centroid, "area": cv2.contourArea(cnt)})
+        area = cv2.contourArea(cnt)
+        if area < min_area:
+            continue
+        bbox = cv2.boundingRect(cnt)
+        M = cv2.moments(cnt)
+        if M["m00"] == 0:
+            continue  # degenerate contour — cannot compute a centroid
+        centroid = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
+        objects.append({"bbox": bbox, "centroid": centroid, "area": area})
     return objects
 
 
