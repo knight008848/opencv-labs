@@ -55,7 +55,11 @@ def define_roi_config(width: int, height: int) -> dict[str, tuple[int, int, int,
     #                  y = round(0.2 * height), h = round(0.6 * height)
     #   inlet:         x = 0, y = 0, w = round(0.25 * width), h = round(0.25 * height)
     #   Return a dict keyed by the same names as ROI_COLORS.
-    pass  # TODO
+    return {
+        "panorama": (0, 0, width, height),
+        "work_area": (round(0.2 * width), round(0.2 * height), round(0.6 * width), round(0.6 * height)),
+        "inlet": (0, 0, round(0.25 * width), round(0.25 * height)),
+    }
 
 
 def analyze_roi(roi_frame: np.ndarray, min_area: int) -> list[dict]:
@@ -77,7 +81,19 @@ def analyze_roi(roi_frame: np.ndarray, min_area: int) -> list[dict]:
     #       bbox = cv2.boundingRect(cnt)
     #       M = cv2.moments(cnt)          # guard M["m00"] == 0
     #       centroid = (int(M["m10"]/M["m00"]), int(M["m01"]/M["m00"]))
-    pass  # TODO
+    gray = cv2.cvtColor(roi_frame, cv2.COLOR_BGR2GRAY)
+    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+    edges = cv2.Canny(blurred, CANNY_LOW, CANNY_HIGH)
+    cnts = cv2.findContours(edges, cv2.RETR_EXTERNAL,
+                             cv2.CHAIN_APPROX_SIMPLE)[0]
+    objects = []
+    for cnt in cnts:
+        if cv2.contourArea(cnt) >= min_area:
+            bbox = cv2.boundingRect(cnt)
+            M = cv2.moments(cnt)          # guard M["m00"] == 0
+            centroid = (int(M["m10"]/M["m00"]), int(M["m01"]/M["m00"]))
+            objects.append({"bbox": bbox, "centroid": centroid, "area": cv2.contourArea(cnt)})
+    return objects
 
 
 def draw_roi_boxes(frame: np.ndarray, roi_config: dict) -> np.ndarray:
@@ -90,7 +106,10 @@ def draw_roi_boxes(frame: np.ndarray, roi_config: dict) -> np.ndarray:
     # Hint: cv2.rectangle(frame, (x, y), (x + w, y + h), ROI_COLORS[name], 2)
     #       then cv2.putText(frame, name, (x + 5, y + 20), FONT_HERSHEY_SIMPLEX,
     #                        0.7, ROI_COLORS[name], 2)
-    pass  # TODO
+    for name, (x, y, w, h) in roi_config.items():
+        cv2.rectangle(frame, (x, y), (x + w, y + h), ROI_COLORS[name], 2)
+        cv2.putText(frame, name, (x + 5, y + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, ROI_COLORS[name], 2)
+    return frame
 
 
 def draw_objects(frame: np.ndarray, objects: list[dict]) -> np.ndarray:
@@ -103,7 +122,11 @@ def draw_objects(frame: np.ndarray, objects: list[dict]) -> np.ndarray:
     #       x, y, w, h = obj["bbox"]
     #       cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
     #       cv2.putText(frame, f"#{idx}", (x + 2, y - 4), ...)
-    pass  # TODO
+    for idx, obj in enumerate(objects):
+        x, y, w, h = obj["bbox"]
+        cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+        cv2.putText(frame, f"#{idx}", (x + 2, y - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+    return frame
 
 
 def build_four_panel(
