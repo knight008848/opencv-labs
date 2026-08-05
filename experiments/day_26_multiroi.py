@@ -33,9 +33,9 @@ CANNY_LOW, CANNY_HIGH = 50, 150  # Canny hysteresis thresholds
 
 # ROI name -> draw color (BGR)
 ROI_COLORS = {
-    "panorama": (0, 0, 255),    # red  — full frame
-    "work_area": (0, 255, 0),   # green — central 60%
-    "inlet": (255, 0, 0),       # blue  — top-left 25%
+    "panorama": (0, 0, 255),  # red  — full frame
+    "work_area": (0, 255, 0),  # green — central 60%
+    "inlet": (255, 0, 0),  # blue  — top-left 25%
 }
 
 
@@ -57,7 +57,12 @@ def define_roi_config(width: int, height: int) -> dict[str, tuple[int, int, int,
     #   Return a dict keyed by the same names as ROI_COLORS.
     return {
         "panorama": (0, 0, width, height),
-        "work_area": (round(0.2 * width), round(0.2 * height), round(0.6 * width), round(0.6 * height)),
+        "work_area": (
+            round(0.2 * width),
+            round(0.2 * height),
+            round(0.6 * width),
+            round(0.6 * height),
+        ),
         "inlet": (0, 0, round(0.25 * width), round(0.25 * height)),
     }
 
@@ -84,14 +89,13 @@ def analyze_roi(roi_frame: np.ndarray, min_area: int) -> list[dict]:
     gray = cv2.cvtColor(roi_frame, cv2.COLOR_BGR2GRAY)
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
     edges = cv2.Canny(blurred, CANNY_LOW, CANNY_HIGH)
-    cnts = cv2.findContours(edges, cv2.RETR_EXTERNAL,
-                             cv2.CHAIN_APPROX_SIMPLE)[0]
+    cnts = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]
     objects = []
     for cnt in cnts:
         if cv2.contourArea(cnt) >= min_area:
             bbox = cv2.boundingRect(cnt)
-            M = cv2.moments(cnt)          # guard M["m00"] == 0
-            centroid = (int(M["m10"]/M["m00"]), int(M["m01"]/M["m00"]))
+            M = cv2.moments(cnt)  # guard M["m00"] == 0
+            centroid = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
             objects.append({"bbox": bbox, "centroid": centroid, "area": cv2.contourArea(cnt)})
     return objects
 
@@ -108,7 +112,9 @@ def draw_roi_boxes(frame: np.ndarray, roi_config: dict) -> np.ndarray:
     #                        0.7, ROI_COLORS[name], 2)
     for name, (x, y, w, h) in roi_config.items():
         cv2.rectangle(frame, (x, y), (x + w, y + h), ROI_COLORS[name], 2)
-        cv2.putText(frame, name, (x + 5, y + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, ROI_COLORS[name], 2)
+        cv2.putText(
+            frame, name, (x + 5, y + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, ROI_COLORS[name], 2
+        )
     return frame
 
 
