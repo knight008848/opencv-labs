@@ -35,6 +35,7 @@ from src.vision.video import (
     create_writer,
     even_size,
     get_video_metadata,
+    iter_every_n_frames,
     iter_kept_frames,
     open_video,
 )
@@ -59,6 +60,7 @@ __all__ = [
     "get_video_metadata",
     "hsv_mask",
     "init_background_subtractor",
+    "iter_every_n_frames",
     "iter_kept_frames",
     "open_video",
     "process_frame",

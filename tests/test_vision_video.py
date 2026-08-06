@@ -11,6 +11,7 @@ from src.vision.video import (
     create_writer,
     even_size,
     get_video_metadata,
+    iter_every_n_frames,
     iter_kept_frames,
     open_video,
 )
@@ -127,7 +128,44 @@ def test_iter_kept_frames_upsample_yields_all_frames(tmp_path):
         assert timestamp == pytest.approx(idx / 10.0)
 
 
-def test_iter_kept_frames_rejects_nonpositive_fps(tmp_path):
+# ──────────────────── iter_every_n_frames ────────────────────
+
+
+def test_iter_every_n_frames_step_5(tmp_path):
+    """10-frame clip, step 5 -> frames 0, 5."""
+    path = tmp_path / "v.mp4"
+    make_test_video(path, fps=30.0, n_frames=10, width=320, height=240)
+    cap = cv2_VideoCapture(path)
+    try:
+        kept = list(iter_every_n_frames(cap, step=5))
+    finally:
+        cap.release()
+    assert [idx for idx, _ in kept] == [0, 5]
+
+
+def test_iter_every_n_frames_step_1_yields_all(tmp_path):
+    path = tmp_path / "v.mp4"
+    make_test_video(path, fps=30.0, n_frames=4, width=320, height=240)
+    cap = cv2_VideoCapture(path)
+    try:
+        kept = list(iter_every_n_frames(cap, step=1))
+    finally:
+        cap.release()
+    assert [idx for idx, _ in kept] == [0, 1, 2, 3]
+
+
+def test_iter_every_n_frames_rejects_zero_step(tmp_path):
+    path = tmp_path / "v.mp4"
+    make_test_video(path, fps=30.0, n_frames=4, width=320, height=240)
+    cap = cv2_VideoCapture(path)
+    try:
+        with pytest.raises(ValueError):
+            list(iter_every_n_frames(cap, step=0))
+    finally:
+        cap.release()
+
+
+def test_iter_every_n_frames_rejects_nonpositive_fps(tmp_path):
     """A zero/negative src_fps must fail loudly, not silently stall."""
     path = tmp_path / "v.mp4"
     make_test_video(path, fps=10.0, n_frames=3, width=320, height=240)

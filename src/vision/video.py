@@ -108,6 +108,27 @@ def iter_kept_frames(cap: cv2.VideoCapture, src_fps: float, output_fps: float):
         frame_idx += 1
 
 
+def iter_every_n_frames(cap: cv2.VideoCapture, step: int = 5):
+    """
+    Single-pass generator yielding every ``step``-th frame.
+
+    Yields ``(src_frame_idx, frame)`` for frame indices 0, step, 2*step, ...
+    Unlike ``iter_kept_frames`` (which resamples on a real-time fps grid),
+    this is a plain frame-index stride — the "sample every N frames" mode
+    used by the data pipeline.
+    """
+    if step < 1:
+        raise ValueError(f"step must be >= 1, got {step}")
+    frame_idx = 0
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        if frame_idx % step == 0:
+            yield frame_idx, frame
+        frame_idx += 1
+
+
 def annotate_frame(frame: np.ndarray, frame_idx: int, timestamp: float) -> np.ndarray:
     """Draw frame number + timestamp text in the top-left corner.
 
