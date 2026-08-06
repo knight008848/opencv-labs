@@ -20,6 +20,7 @@ from src.vision.objects import (
     find_objects,
     update_trajectories,
 )
+from src.vision.panel import fit_to_height, stack_panels
 from src.vision.roi import (
     DEFAULT_ROI_COLORS,
     DEFAULT_ROI_FRACTIONS,
@@ -54,11 +55,13 @@ __all__ = [
     "draw_trajectories",
     "even_size",
     "find_objects",
+    "fit_to_height",
     "get_video_metadata",
     "hsv_mask",
     "init_background_subtractor",
     "iter_kept_frames",
     "open_video",
     "process_frame",
+    "stack_panels",
     "update_trajectories",
 ]
