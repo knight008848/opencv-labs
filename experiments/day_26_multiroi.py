@@ -9,14 +9,32 @@ Runtime: ~10 s
 
 Headless note: no imshow / waitKey / trackbar. Visualisation via PNG
 export. See CLAUDE.md for headless policy.
+
+Refactored 2026-08-06: ROI / segmentation / panel helpers now live in
+src/vision.
 """
 
 import json
+import sys
 import time
 from pathlib import Path
 
 import cv2
-import numpy as np
+
+# Ensure project root is on sys.path so src/ imports resolve
+_project_root = Path(__file__).resolve().parent.parent
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
+from src.vision import (  # noqa: E402
+    RED_RANGES,
+    crop_roi,
+    define_roi_config,
+    detect_hsv_objects,
+    draw_objects,
+    draw_roi_boxes,
+    stack_panels,
+)
 
 # Resolve paths
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -35,11 +53,8 @@ FRAME_NUMBER = 100  # which source frame to analyze (0-based)
 MIN_AREA_FRACTION = 0.0015  # 0.15% of the ROI area
 
 # HSV red-color segmentation (matched to the rolling-ball target):
-# hue wraps around 0°, so red needs TWO hue bands (0-10 and 170-180).
-HSV_RED_LOWER_1 = (0, 80, 60)
-HSV_RED_UPPER_1 = (10, 255, 255)
-HSV_RED_LOWER_2 = (170, 80, 60)
-HSV_RED_UPPER_2 = (180, 255, 255)
+# the hue ranges live in src.vision.segmentation.RED_RANGES; here we tune
+# only the morphology so the ball disk becomes one solid blob.
 CLOSE_KERNEL = 15  # close gaps so the ball disk becomes one solid blob
 OPEN_KERNEL = 3  # drop isolated salt-pixel noise
 
@@ -51,96 +66,21 @@ ROI_COLORS = {
 }
 
 
-def define_roi_config(width: int, height: int) -> dict[str, tuple[int, int, int, int]]:
+def analyze_roi(roi_frame: cv2.typing.MatLike) -> list[dict]:
     """
-    Return roi_name -> (x, y, w, h) slices for the three analysis windows.
-      - "panorama":  whole frame
-      - "work_area": central 60% of the frame
-      - "inlet":     top-left 25% of the frame
-    All extents are computed as fractions of the frame size, so the same
-    config works for any resolution.
-    """
-    return {
-        "panorama": (0, 0, width, height),
-        "work_area": (
-            round(0.2 * width),
-            round(0.2 * height),
-            round(0.6 * width),
-            round(0.6 * height),
-        ),
-        "inlet": (0, 0, round(0.25 * width), round(0.25 * height)),
-    }
-
-
-def analyze_roi(roi_frame: np.ndarray) -> list[dict]:
-    """
-    Run the standard detection pipeline inside one ROI:
-      BGR -> HSV -> red mask (two hue bands) -> morph close/open ->
-      findContours -> area filter (>= MIN_AREA_FRACTION of the ROI area).
-    The red-color segmentation is matched to the rolling-ball target:
-    the ball is low-contrast in grayscale (its Canny edges fragment and
-    merge with the frame border), but it is cleanly isolated by hue.
+    Run the standard detection pipeline inside one ROI: HSV red segmentation
+    (two hue bands from src.vision) -> morph close/open -> area filter.
     NOTE: this single function must serve ALL ROIs (same logic everywhere).
-    Returns a list of {"bbox": (x, y, w, h), "centroid": (cx, cy),
-                       "area": float} — one entry per detected object.
-    Known limit: a motion-blurred / heavily occluded ball can shrink below
-    the threshold and be dropped for that frame (single-frame analysis —
-    frame-to-frame tracking is Day 25 territory).
+    Returns a list of {"bbox", "centroid", "area"} — one entry per object.
     """
-    min_area = MIN_AREA_FRACTION * roi_frame.shape[0] * roi_frame.shape[1]
-    hsv = cv2.cvtColor(roi_frame, cv2.COLOR_BGR2HSV)
-    mask = cv2.inRange(hsv, HSV_RED_LOWER_1, HSV_RED_UPPER_1) | cv2.inRange(
-        hsv, HSV_RED_LOWER_2, HSV_RED_UPPER_2
-    )
-    # close gaps so the ball disk is one solid blob, then drop salt noise
-    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((CLOSE_KERNEL, CLOSE_KERNEL), np.uint8))
-    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((OPEN_KERNEL, OPEN_KERNEL), np.uint8))
-    cnts = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]
-    objects = []
-    for cnt in cnts:
-        area = cv2.contourArea(cnt)
-        if area < min_area:
-            continue
-        bbox = cv2.boundingRect(cnt)
-        M = cv2.moments(cnt)
-        if M["m00"] == 0:
-            continue  # degenerate contour — cannot compute a centroid
-        centroid = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
-        objects.append({"bbox": bbox, "centroid": centroid, "area": area})
-    return objects
-
-
-def draw_roi_boxes(frame: np.ndarray, roi_config: dict) -> np.ndarray:
-    """
-    Draw one rectangle per ROI on the original frame, colored per ROI_COLORS,
-    and label each rectangle with its roi name via cv2.putText.
-    Returns the annotated frame (mutates the input in place).
-    """
-    for name, (x, y, w, h) in roi_config.items():
-        cv2.rectangle(frame, (x, y), (x + w, y + h), ROI_COLORS[name], 2)
-        cv2.putText(
-            frame, name, (x + 5, y + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, ROI_COLORS[name], 2
-        )
-    return frame
-
-
-def draw_objects(frame: np.ndarray, objects: list[dict]) -> np.ndarray:
-    """
-    Draw each detected object as a green bounding box + an "#id" label.
-    Returns the annotated frame (mutates the input in place).
-    """
-    for idx, obj in enumerate(objects):
-        x, y, w, h = obj["bbox"]
-        cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-        cv2.putText(frame, f"#{idx}", (x + 2, y - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-    return frame
+    return detect_hsv_objects(roi_frame, RED_RANGES, MIN_AREA_FRACTION, CLOSE_KERNEL, OPEN_KERNEL)
 
 
 def build_four_panel(
-    original: np.ndarray,
-    roi_config: dict,
+    original: cv2.typing.MatLike,
+    roi_config: dict[str, tuple[int, int, int, int]],
     results: dict[str, list[dict]],
-) -> np.ndarray:
+):
     """
     Combine into one 2x2 figure:
       Panel 0: original frame + ROI boxes + labels
@@ -148,26 +88,18 @@ def build_four_panel(
     All panels are resized to a common display size, then stacked 2x2.
     Returns the combined BGR image.
     """
-    DISPLAY_W, DISPLAY_H = 640, 360  # common size for all four panels
-
-    def to_display(img: np.ndarray) -> np.ndarray:
-        """Resize any panel to the common display size."""
-        return cv2.resize(img, (DISPLAY_W, DISPLAY_H))
-
     # Panel 0: original frame with ROI boxes + labels
-    panel0 = draw_roi_boxes(original.copy(), roi_config)
+    panel0 = draw_roi_boxes(original.copy(), roi_config, ROI_COLORS)
 
-    # Panels 1-3: one annotated analysis per ROI
+    # Panels 1-3: one annotated analysis per ROI (per-ROI label color)
     roi_panels = []
-    for name, (x, y, w, h) in roi_config.items():
-        crop = original[y : y + h, x : x + w]
-        panel = draw_objects(crop.copy(), results[name])
+    for name, rect in roi_config.items():
+        crop = crop_roi(original, rect)
+        panel = draw_objects(crop.copy(), results[name], show_id=True)
         cv2.putText(panel, name, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, ROI_COLORS[name], 2)
         roi_panels.append(panel)
 
-    top_row = np.hstack([to_display(panel0), to_display(roi_panels[0])])
-    bottom_row = np.hstack([to_display(roi_panels[1]), to_display(roi_panels[2])])
-    return np.vstack([top_row, bottom_row])
+    return stack_panels([panel0, *roi_panels], cols=2, display_size=(640, 360))
 
 
 def print_results(results: dict[str, list[dict]]) -> None:
@@ -211,8 +143,8 @@ def main() -> None:
 
     start = time.perf_counter()
     results: dict[str, list[dict]] = {}
-    for name, (x, y, rw, rh) in roi_config.items():
-        roi_frame = frame[y : y + rh, x : x + rw]
+    for name, rect in roi_config.items():
+        roi_frame = crop_roi(frame, rect)
         results[name] = analyze_roi(roi_frame)
     elapsed = time.perf_counter() - start
 
