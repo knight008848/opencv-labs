@@ -14,6 +14,7 @@ from src.vision.background import (
     init_background_subtractor,
     process_frame,
 )
+from src.vision.features import extract_color_features
 from src.vision.objects import (
     draw_objects,
     draw_trajectories,
@@ -55,6 +56,7 @@ __all__ = [
     "draw_roi_boxes",
     "draw_trajectories",
     "even_size",
+    "extract_color_features",
     "find_objects",
     "fit_to_height",
     "get_video_metadata",
