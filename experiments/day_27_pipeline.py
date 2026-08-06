@@ -93,13 +93,11 @@ def analyze_roi(roi_frame: np.ndarray) -> tuple[list[dict], list[list[float]]]:
       features: list of [cx, cy, area, mean_b, mean_g, mean_r] — one vector
                 per object, aligned with ``objects``.
     """
-    # ── Your implementation here ──
-    # Hint:
-    #   1. mask = hsv_mask(roi_frame, RED_RANGES, CLOSE_KERNEL, OPEN_KERNEL)
-    #   2. min_area = MIN_AREA_FRACTION * roi_frame.shape[0] * roi_frame.shape[1]
-    #   3. objects = find_objects(mask, min_area)
-    #   4. features = extract_color_features(roi_frame, objects, mask)
-    raise NotImplementedError("fill in analyze_roi")
+    mask = hsv_mask(roi_frame, RED_RANGES, CLOSE_KERNEL, OPEN_KERNEL)
+    min_area = MIN_AREA_FRACTION * roi_frame.shape[0] * roi_frame.shape[1]
+    objects = find_objects(mask, min_area)
+    features = extract_color_features(roi_frame, objects, mask)
+    return objects, features
 
 
 # ──────────────── Stage 2: Frame rendering (visualization) ───────
@@ -119,14 +117,30 @@ def render_frame(
     shifted by the ROI origin (x, y) before being drawn on the full frame.
     Returns the annotated BGR frame (mutates a copy of the input).
     """
-    # ── Your implementation here ──
-    # Hint:
-    #   1. vis = draw_roi_boxes(frame.copy(), roi_config, roi_colors)
-    #   2. For each ROI: shift every object bbox/centroid by (ox, oy), then
-    #      draw_objects(vis, shifted_objects, show_id=True)
-    #   3. For each trail in state[name]["trails"], shift the centroid points
-    #      by (ox, oy) and draw them with draw_trajectories / cv2.polylines
-    raise NotImplementedError("fill in render_frame")
+    vis = draw_roi_boxes(frame.copy(), roi_config, roi_colors)
+    
+    for name, objects in roi_objects.items():
+        ox, oy, _rw, _rh = roi_config[name]
+        
+        shifted_objects = []
+        for obj in objects:
+            shifted_obj = obj.copy()
+            x, y, w, h = obj["bbox"]
+            shifted_obj["bbox"] = (x + ox, y + oy, w, h)
+            cx, cy = obj["centroid"]
+            shifted_obj["centroid"] = (cx + ox, cy + oy)
+            shifted_objects.append(shifted_obj)
+            
+        vis = draw_objects(vis, shifted_objects, show_id=True)
+        
+        trails = state[name]["trails"]
+        shifted_trails = {}
+        for obj_id, trail in trails.items():
+            shifted_trails[obj_id] = [(cx + ox, cy + oy) for (cx, cy) in trail]
+            
+        vis = draw_trajectories(vis, shifted_trails)
+        
+    return vis
 
 
 # ──────────────── Stage 3: Cross-frame tracking glue ─────────────
