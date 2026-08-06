@@ -646,6 +646,23 @@ Week 4 进阶+项目:    5/9 天  (含 Day 29-30 项目冲刺)
 
 ---
 
+## 架构重构（2026-08-06）
+
+- [x] 抽取 day 24-26 可复用逻辑到 `src/vision/`（TDD 驱动）
+  - `video.py` — 视频 I/O：元数据 / writer / 实时帧网格迭代器
+  - `background.py` — MOG2 背景减除 + 阴影丢弃
+  - `objects.py` — 轮廓→物体 / 绘制 / 最近邻轨迹跟踪
+  - `segmentation.py` — HSV 色彩分割（双色带 + 形态学）
+  - `roi.py` — 分数化 ROI 定义 / 裁剪 / 绘制
+  - `panel.py` — 面板拼图（统一三面板/四面板）
+- [x] day 24/25/26 脚本改为消费 `src/vision`（删除 ~512 行内联重复）
+- [x] 行为验证：day 24 实时节奏 OK / day 25 552 面板 / day 26 检测结果一致
+- [x] 测试 116 → 119 全绿（含 `python -m pytest` 与裸 `pytest`）
+- [x] code-reviewer 审核通过：修复上采样停滞、ROI 缺 key 回退、测试 hermetic 化
+- 未来脚本导入方式：`from src.vision import detect_hsv_objects`
+
+---
+
 ## 下一步计划
 
 - [x] Day 14: 阶段测试 2 — 87% (8.7/10)
