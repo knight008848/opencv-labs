@@ -20,6 +20,7 @@ from src.vision.objects import (
     find_objects,
     update_trajectories,
 )
+from src.vision.segmentation import RED_RANGES, detect_hsv_objects, hsv_mask
 from src.vision.video import (
     DEFAULT_FOURCC,
     annotate_frame,
@@ -34,12 +35,15 @@ __all__ = [
     "DEFAULT_FOURCC",
     "annotate_frame",
     "clean_foreground_mask",
+    "RED_RANGES",
     "create_writer",
+    "detect_hsv_objects",
     "draw_objects",
     "draw_trajectories",
     "even_size",
     "find_objects",
     "get_video_metadata",
+    "hsv_mask",
     "init_background_subtractor",
     "iter_kept_frames",
     "open_video",
