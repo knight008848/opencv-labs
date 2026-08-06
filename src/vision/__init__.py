@@ -20,6 +20,13 @@ from src.vision.objects import (
     find_objects,
     update_trajectories,
 )
+from src.vision.roi import (
+    DEFAULT_ROI_COLORS,
+    DEFAULT_ROI_FRACTIONS,
+    crop_roi,
+    define_roi_config,
+    draw_roi_boxes,
+)
 from src.vision.segmentation import RED_RANGES, detect_hsv_objects, hsv_mask
 from src.vision.video import (
     DEFAULT_FOURCC,
@@ -35,10 +42,15 @@ __all__ = [
     "DEFAULT_FOURCC",
     "annotate_frame",
     "clean_foreground_mask",
+    "DEFAULT_ROI_COLORS",
+    "DEFAULT_ROI_FRACTIONS",
     "RED_RANGES",
     "create_writer",
+    "crop_roi",
+    "define_roi_config",
     "detect_hsv_objects",
     "draw_objects",
+    "draw_roi_boxes",
     "draw_trajectories",
     "even_size",
     "find_objects",
