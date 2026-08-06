@@ -73,7 +73,9 @@ def test_extract_color_features_uses_mask_only():
 def test_day27_analyze_roi():
     import importlib.util
     from pathlib import Path
+
     import cv2
+
     root = Path(__file__).resolve().parent.parent
     d27_path = root / "experiments" / "day_27_pipeline.py"
     spec = importlib.util.spec_from_file_location("day_27_pipeline", d27_path)
@@ -82,7 +84,7 @@ def test_day27_analyze_roi():
 
     roi_frame = np.zeros((100, 100, 3), dtype=np.uint8)
     cv2.circle(roi_frame, (50, 50), 20, (0, 0, 255), -1)
-    
+
     objects, features = D27.analyze_roi(roi_frame)
     assert isinstance(objects, list)
     assert isinstance(features, list)

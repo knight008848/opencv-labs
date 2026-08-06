@@ -27,7 +27,7 @@
 
 ```python
 blended = cv2.addWeighted(img1, 0.7, img2, 0.3, 0)  # 70% img1 + 30% img2
-diff = cv2.absdiff(img1, img2)                        # 差异图
+diff = cv2.absdiff(img1, img2)  # 差异图
 ```
 
 ### 真实案例
@@ -53,7 +53,7 @@ diff = cv2.absdiff(img1, img2)                        # 差异图
 `cv2.bitwise_and(img, img, mask=mask)` 是最常用的组合——掩膜中白色(255)的区域保留原图像素，黑色(0)的区域变黑。这比 ROI 更灵活，因为掩膜可以是任意形状的。
 
 ```python
-mask = cv2.inRange(hsv, lower, upper)          # 颜色掩膜
+mask = cv2.inRange(hsv, lower, upper)  # 颜色掩膜
 result = cv2.bitwise_and(img, img, mask=mask)  # 只保留掩膜区域
 ```
 

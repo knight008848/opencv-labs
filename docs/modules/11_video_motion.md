@@ -27,14 +27,15 @@
 ### 技术解释
 ```python
 cap = cv2.VideoCapture("video.mp4")
-fps = cap.get(cv2.CAP_PROP_FPS)           # 每秒帧数
+fps = cap.get(cv2.CAP_PROP_FPS)  # 每秒帧数
 total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))  # 总帧数
 w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
 while True:
     ret, frame = cap.read()  # ret=False 表示视频结束
-    if not ret: break
+    if not ret:
+        break
     timestamp = frame_idx / fps  # 当前时间（秒）
     frame_idx += 1
 cap.release()
@@ -62,9 +63,9 @@ VideoCapture 是拆胶片，VideoWriter 是装胶片——你把逐帧处理过�
 
 ### 技术解释
 ```python
-fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # MP4 编码
+fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # MP4 编码
 out = cv2.VideoWriter("output.mp4", fourcc, fps, (w, h))
-out.write(processed_frame)   # 每帧写入
+out.write(processed_frame)  # 每帧写入
 out.release()
 ```
 常见 fourcc：`'mp4v'`（MP4）、`'XVID'`（AVI）、`'avc1'`（H.264，需额外安装）。写入帧的尺寸必须和初始化时声明的 (w, h) 完全一致，否则写入失败（静默）。
@@ -123,8 +124,8 @@ fg_mask = cv2.morphologyEx(fg_mask, cv2.MORPH_OPEN, kernel)
 
 ```python
 # 简化版帧间追踪
-prev_centroids = [(cx1,cy1), (cx2,cy2), ...]
-curr_centroids = [(cx1,cy1), (cx2,cy2), ...]
+prev_centroids = [(cx1, cy1), (cx2, cy2), ...]
+curr_centroids = [(cx1, cy1), (cx2, cy2), ...]
 # 计算距离矩阵
 # 距离 < max_distance → 匹配成功 → 更新轨迹
 # 未匹配的 curr → 新物体出现

@@ -27,8 +27,9 @@
 
 ```python
 edges = cv2.Canny(gray, 50, 150)
-lines = cv2.HoughLinesP(edges, rho=1, theta=np.pi/180, threshold=100,
-                        minLineLength=50, maxLineGap=10)
+lines = cv2.HoughLinesP(
+    edges, rho=1, theta=np.pi / 180, threshold=100, minLineLength=50, maxLineGap=10
+)
 # threshold: 最少投票数（越高=越严格）
 # minLineLength: 最短线段长度（过滤短线）
 # maxLineGap: 线段间最大间隙（间隙小于此值则连接）
@@ -57,8 +58,9 @@ lines = cv2.HoughLinesP(edges, rho=1, theta=np.pi/180, threshold=100,
 `HoughCircles` 内部使用"梯度法"——先计算每个边缘点的梯度方向，圆心应位于梯度方向上（大幅减少搜索空间）。关键参数：`dp`（累加器分辨率）、`minDist`（圆心最小间距）、`param1`（Canny 高阈值）、`param2`（圆心累加器阈值，越小=越多假阳性）。
 
 ```python
-circles = cv2.HoughCircles(gray, cv2.HOUGH_GRADIENT, dp=1, minDist=50,
-                           param1=100, param2=30, minRadius=10, maxRadius=200)
+circles = cv2.HoughCircles(
+    gray, cv2.HOUGH_GRADIENT, dp=1, minDist=50, param1=100, param2=30, minRadius=10, maxRadius=200
+)
 ```
 
 ### 真实案例
@@ -91,7 +93,8 @@ Pipeline = 将多个处理步骤串联，前一步的输出是后一步的输入
 def pipeline(image_path, config):
     # Step 1: Load
     img = cv2.imread(image_path)
-    if img is None: raise ValueError(f"Cannot load {image_path}")
+    if img is None:
+        raise ValueError(f"Cannot load {image_path}")
     # Step 2: Preprocess
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     blurred = cv2.GaussianBlur(gray, config["blur_ksize"], 0)

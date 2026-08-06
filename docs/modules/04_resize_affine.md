@@ -53,7 +53,7 @@ large = cv2.resize(img, (500, 300), interpolation=cv2.INTER_CUBIC)  # 注意：(
 
 ```python
 h, w = img.shape[:2]
-M = cv2.getRotationMatrix2D((w/2, h/2), 45, 1.0)  # 绕中心旋转45°
+M = cv2.getRotationMatrix2D((w / 2, h / 2), 45, 1.0)  # 绕中心旋转45°
 rotated = cv2.warpAffine(img, M, (w, h))
 ```
 
@@ -81,8 +81,8 @@ Google 地图的缩放层级——最底层是街道细节（原始分辨率）�
 高斯金字塔：每次 `pyrDown` 将尺寸减半——先用高斯核模糊（去高频噪声防止混叠），再删掉偶数列和偶数行。拉普拉斯金字塔：存储每层 `pyrUp(pyrDown(img)) - img` 的差值——即模糊丢失的"细节层"。
 
 ```python
-smaller = cv2.pyrDown(img)   # 尺寸减半
-bigger = cv2.pyrUp(img)      # 尺寸加倍（不能恢复丢失的细节）
+smaller = cv2.pyrDown(img)  # 尺寸减半
+bigger = cv2.pyrUp(img)  # 尺寸加倍（不能恢复丢失的细节）
 ```
 
 ### 真实案例

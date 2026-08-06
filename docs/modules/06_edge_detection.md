@@ -28,7 +28,7 @@ Sobel 核是 3×3 的矩阵。X 方向核 `[[-1,0,1],[-2,0,2],[-1,0,1]]` 检测�
 ```python
 sobel_x = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)  # X 方向梯度
 sobel_y = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)  # Y 方向梯度
-sobel_combined = cv2.magnitude(sobel_x, sobel_y)        # 合并
+sobel_combined = cv2.magnitude(sobel_x, sobel_y)  # 合并
 ```
 
 ### 真实案例
@@ -55,8 +55,8 @@ Canny 的两个阈值（`threshold1` 低, `threshold2` 高）是最关键参数�
 
 ```python
 gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-blurred = cv2.GaussianBlur(gray, (5, 5), 0)    # 先降噪
-edges = cv2.Canny(blurred, 50, 150)            # 低阈值=50, 高阈值=150
+blurred = cv2.GaussianBlur(gray, (5, 5), 0)  # 先降噪
+edges = cv2.Canny(blurred, 50, 150)  # 低阈值=50, 高阈值=150
 ```
 
 ### 真实案例

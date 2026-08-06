@@ -27,10 +27,11 @@ OpenCV 用 NumPy 的 `ndarray` 存储图像。一张 480×640 的彩色图在内
 
 ```python
 import cv2
-img = cv2.imread("photo.jpg")       # 读取 → ndarray
-print(img.shape)                     # (480, 640, 3)
-print(img.dtype)                     # uint8
-b, g, r = img[100, 200]             # 访问第 100 行、第 200 列的像素
+
+img = cv2.imread("photo.jpg")  # 读取 → ndarray
+print(img.shape)  # (480, 640, 3)
+print(img.dtype)  # uint8
+b, g, r = img[100, 200]  # 访问第 100 行、第 200 列的像素
 ```
 
 ### 真实案例
@@ -58,7 +59,7 @@ BGR 和 RGB 就像两种不同的调料瓶排列——同样的三种调料（�
 
 ```python
 gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)  # (480, 640) 单通道
-rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)     # (480, 640, 3) 通道顺序变了
+rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # (480, 640, 3) 通道顺序变了
 ```
 
 ### 真实案例
@@ -82,8 +83,8 @@ rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)     # (480, 640, 3) 通道顺序变�
 
 ```python
 cv2.imshow("My Image", img)
-key = cv2.waitKey(0)          # 等待按键
-if key == 27:                 # ESC
+key = cv2.waitKey(0)  # 等待按键
+if key == 27:  # ESC
     cv2.destroyAllWindows()
 ```
 

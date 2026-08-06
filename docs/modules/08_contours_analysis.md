@@ -95,9 +95,12 @@ circularity = 4 * np.pi * area / (perimeter * perimeter)
 epsilon = 0.02 * cv2.arcLength(cnt, True)
 approx = cv2.approxPolyDP(cnt, epsilon, True)
 vertices = len(approx)
-if vertices == 3: shape = "Triangle"
-elif vertices == 4: shape = "Rectangle"
-elif vertices > 8: shape = "Circle"
+if vertices == 3:
+    shape = "Triangle"
+elif vertices == 4:
+    shape = "Rectangle"
+elif vertices > 8:
+    shape = "Circle"
 ```
 
 ### 真实案例

@@ -118,10 +118,10 @@ def render_frame(
     Returns the annotated BGR frame (mutates a copy of the input).
     """
     vis = draw_roi_boxes(frame.copy(), roi_config, roi_colors)
-    
+
     for name, objects in roi_objects.items():
         ox, oy, _rw, _rh = roi_config[name]
-        
+
         shifted_objects = []
         for obj in objects:
             shifted_obj = obj.copy()
@@ -130,16 +130,16 @@ def render_frame(
             cx, cy = obj["centroid"]
             shifted_obj["centroid"] = (cx + ox, cy + oy)
             shifted_objects.append(shifted_obj)
-            
+
         vis = draw_objects(vis, shifted_objects, show_id=True)
-        
+
         trails = state[name]["trails"]
         shifted_trails = {}
         for obj_id, trail in trails.items():
             shifted_trails[obj_id] = [(cx + ox, cy + oy) for (cx, cy) in trail]
-            
+
         vis = draw_trajectories(vis, shifted_trails)
-        
+
     return vis
 
 
@@ -227,7 +227,9 @@ def main() -> None:
     roi_names = list(roi_config)
 
     # Per-ROI tracking state: trails, next id, appear/disappear timeline
-    state: dict[str, dict] = {name: {"trails": {}, "next_id": 0, "timeline": {}} for name in roi_names}
+    state: dict[str, dict] = {
+        name: {"trails": {}, "next_id": 0, "timeline": {}} for name in roi_names
+    }
 
     out_video = OUTPUT_DIR / "day_27_annotated.mp4"
     writer = create_writer(out_video, OUTPUT_FPS, even_size(w, h))
@@ -263,7 +265,11 @@ def main() -> None:
     # ── Stage 4: write structured outputs ──
     output_path = OUTPUT_DIR / "output.json"
     with open(output_path, "w") as f:
-        json.dump({"source": VIDEO_PATH.name, "frame_step": FRAME_STEP, "frames": frames_json}, f, indent=2)
+        json.dump(
+            {"source": VIDEO_PATH.name, "frame_step": FRAME_STEP, "frames": frames_json},
+            f,
+            indent=2,
+        )
 
     arrays = pack_features(all_features, roi_names, len(frames_json))
     np.savez(OUTPUT_DIR / "features.npz", **arrays)

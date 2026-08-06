@@ -27,13 +27,13 @@
 ### 技术解释
 ```python
 roi_config = {
-    "global_view":  (0, 0, img_w, img_h),           # 全图
-    "work_area":    (100, 50, 300, 250),             # 操作区
-    "inlet":        (400, 300, 200, 150),            # 入口
+    "global_view": (0, 0, img_w, img_h),  # 全图
+    "work_area": (100, 50, 300, 250),  # 操作区
+    "inlet": (400, 300, 200, 150),  # 入口
 }
 
 for roi_name, (x, y, w, h) in roi_config.items():
-    roi_frame = frame[y:y+h, x:x+w]
+    roi_frame = frame[y : y + h, x : x + w]
     # 对 roi_frame 做完整的分析 Pipeline
     features = analyze_roi(roi_frame)
     results[roi_name] = features
@@ -63,23 +63,24 @@ for roi_name, (x, y, w, h) in roi_config.items():
 ```python
 def analyze_roi(roi_frame):
     gray = cv2.cvtColor(roi_frame, cv2.COLOR_BGR2GRAY)
-    blurred = cv2.GaussianBlur(gray, (5,5), 0)
+    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
     # 方法 A：颜色过滤
     hsv = cv2.cvtColor(roi_frame, cv2.COLOR_BGR2HSV)
     mask = cv2.inRange(hsv, lower, upper)
     # 方法 B：边缘+轮廓
     edges = cv2.Canny(blurred, 50, 150)
     contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    
+
     objects = []
     for cnt in contours:
         if cv2.contourArea(cnt) > 200:
             x, y, w, h = cv2.boundingRect(cnt)
             M = cv2.moments(cnt)
-            cx = int(M["m10"]/M["m00"]) if M["m00"]>0 else 0
-            cy = int(M["m01"]/M["m00"]) if M["m00"]>0 else 0
-            objects.append({"bbox":[x,y,w,h], "centroid":[cx,cy],
-                          "area":cv2.contourArea(cnt)})
+            cx = int(M["m10"] / M["m00"]) if M["m00"] > 0 else 0
+            cy = int(M["m01"] / M["m00"]) if M["m00"] > 0 else 0
+            objects.append(
+                {"bbox": [x, y, w, h], "centroid": [cx, cy], "area": cv2.contourArea(cnt)}
+            )
     return objects
 ```
 
@@ -108,21 +109,20 @@ def match_objects(prev_objects, curr_objects, max_dist=50):
     """Match objects between frames using nearest-centroid."""
     matches = {}
     matched_curr = set()
-    
+
     for i, prev in enumerate(prev_objects):
-        best_j, best_dist = None, float('inf')
+        best_j, best_dist = None, float("inf")
         for j, curr in enumerate(curr_objects):
-            if j in matched_curr: continue
-            dist = np.linalg.norm(
-                np.array(prev["centroid"]) - np.array(curr["centroid"])
-            )
+            if j in matched_curr:
+                continue
+            dist = np.linalg.norm(np.array(prev["centroid"]) - np.array(curr["centroid"]))
             if dist < best_dist:
                 best_dist, best_j = dist, j
-        
+
         if best_dist < max_dist:
             matches[i] = best_j
             matched_curr.add(best_j)
-    
+
     return matches  # {prev_idx: curr_idx}
 ```
 `max_dist` 是核心参数——太大容易错配，太小容易断配。一般取物体尺寸的 2-3 倍。
@@ -159,25 +159,31 @@ output = {
             "rois": {
                 "global_view": {
                     "objects": [
-                        {"id": 1, "bbox": [100,50,80,60], "centroid": [140,80],
-                         "area": 4800, "color": "red"}
+                        {
+                            "id": 1,
+                            "bbox": [100, 50, 80, 60],
+                            "centroid": [140, 80],
+                            "area": 4800,
+                            "color": "red",
+                        }
                     ]
                 },
                 "work_area": {"objects": [...]},
-                "inlet": {"objects": []}
-            }
+                "inlet": {"objects": []},
+            },
         },
         # ... more frames
-    ]
+    ],
 }
 
 with open("output.json", "w") as f:
     json.dump(output, f, indent=2)
 
 # 特征向量单独存
-np.savez("features.npz",
-    frame_0_global=np.array([[140,80,4800,0,0,255]]),
-    frame_1_global=np.array([[142,82,4780,0,0,255]]),
+np.savez(
+    "features.npz",
+    frame_0_global=np.array([[140, 80, 4800, 0, 0, 255]]),
+    frame_1_global=np.array([[142, 82, 4780, 0, 0, 255]]),
 )
 ```
 JSON 存语义信息（什么颜色、什么形状、在哪个位置），NPZ 存"向量化后的观察"（模型可以直接输入的数字）。

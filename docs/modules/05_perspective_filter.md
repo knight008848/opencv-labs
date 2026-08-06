@@ -26,8 +26,8 @@
 透视变换由 4 对对应点确定一个 3×3 的单应矩阵。这个矩阵描述了"源图中的任意点 (x,y) 应该映射到目标图的哪个位置"。`warpPerspective` 遍历目标图的每个像素，通过逆矩阵反查它在源图中的位置，采样填充。
 
 ```python
-src_pts = np.float32([[x1,y1],[x2,y2],[x3,y3],[x4,y4]])  # 原图中四角
-dst_pts = np.float32([[0,0],[w,0],[w,h],[0,h]])           # 目标矩形
+src_pts = np.float32([[x1, y1], [x2, y2], [x3, y3], [x4, y4]])  # 原图中四角
+dst_pts = np.float32([[0, 0], [w, 0], [w, h], [0, h]])  # 目标矩形
 M = cv2.getPerspectiveTransform(src_pts, dst_pts)
 warped = cv2.warpPerspective(img, M, (w, h))
 ```
@@ -82,8 +82,8 @@ blur_strong = cv2.GaussianBlur(img, (15, 15), 0)  # 更模糊
 `medianBlur` 对椒盐噪声效果远优于高斯。`bilateralFilter` 有两个 sigma：`sigmaColor`（颜色差异多大就视为边界）和 `sigmaSpace`（空间距离多远就不算邻居）。缺点是计算慢——比高斯慢 10-50 倍。
 
 ```python
-median = cv2.medianBlur(img, 5)                    # ksize 必须是奇数
-bilateral = cv2.bilateralFilter(img, 9, 75, 75)    # d, sigmaColor, sigmaSpace
+median = cv2.medianBlur(img, 5)  # ksize 必须是奇数
+bilateral = cv2.bilateralFilter(img, 9, 75, 75)  # d, sigmaColor, sigmaSpace
 ```
 
 ### 真实案例
@@ -158,8 +158,8 @@ bilateral = cv2.bilateralFilter(img, 9, 75, 75)    # d, sigmaColor, sigmaSpace
 ### Q5（代码补全）
 将倾斜图矫正为正视图：
 ```python
-src = np.float32([[10,20],[200,15],[220,180],[5,170]])
-dst = np.float32([[0,0],[____,0],[300,200],[0,____]])
+src = np.float32([[10, 20], [200, 15], [220, 180], [5, 170]])
+dst = np.float32([[0, 0], [____, 0], [300, 200], [0, ____]])
 M = cv2.____(src, dst)
 result = cv2.____(img, M, (300, 200))
 ```

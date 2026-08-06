@@ -26,8 +26,8 @@
 ROI 是原图的一个**视图**（view），不是拷贝——修改 ROI 会直接影响原图。这是因为 NumPy 切片返回的是同一块内存的引用。需要独立副本时用 `roi.copy()`。切片语法 `img[行起点:行终点, 列起点:列终点]` 遵循 Python 左闭右开惯例。
 
 ```python
-roi = img[50:200, 100:300]         # 切出 [50,200) 行、[100,300) 列
-img[200:350, 100:300] = roi        # 把 ROI 粘贴到另一个位置
+roi = img[50:200, 100:300]  # 切出 [50,200) 行、[100,300) 列
+img[200:350, 100:300] = roi  # 把 ROI 粘贴到另一个位置
 roi_copy = img[50:200, 100:300].copy()  # 独立副本，修改不影响原图
 ```
 
@@ -84,7 +84,7 @@ hist = cv2.calcHist([gray], [0], None, [256], [0, 256])
 equ = cv2.equalizeHist(gray)  # 灰度图均衡化
 # 彩色图正确做法：
 hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-hsv[:,:,2] = cv2.equalizeHist(hsv[:,:,2])  # 只调明度通道
+hsv[:, :, 2] = cv2.equalizeHist(hsv[:, :, 2])  # 只调明度通道
 result = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
 ```
 
