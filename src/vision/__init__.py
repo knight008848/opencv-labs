@@ -9,6 +9,11 @@ Public API (both import styles work):
     from src.vision import get_video_metadata
 """
 
+from src.vision.background import (
+    clean_foreground_mask,
+    init_background_subtractor,
+    process_frame,
+)
 from src.vision.video import (
     DEFAULT_FOURCC,
     annotate_frame,
@@ -22,9 +27,12 @@ from src.vision.video import (
 __all__ = [
     "DEFAULT_FOURCC",
     "annotate_frame",
+    "clean_foreground_mask",
     "create_writer",
     "even_size",
     "get_video_metadata",
+    "init_background_subtractor",
     "iter_kept_frames",
     "open_video",
+    "process_frame",
 ]
