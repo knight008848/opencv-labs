@@ -29,6 +29,12 @@ def test_define_roi_config_custom_fractions():
     assert cfg["half"] == (0, 0, 50, 50)
 
 
+def test_define_roi_config_empty_dict_is_honored():
+    """An explicitly empty dict must mean 'no ROIs', not fall back to defaults."""
+    cfg = define_roi_config(100, 100, {})
+    assert cfg == {}
+
+
 def test_crop_roi_crops_exact_region():
     frame = np.arange(100 * 100, dtype=np.uint8).reshape(100, 100)
     crop = crop_roi(frame, (10, 20, 30, 40))
@@ -53,3 +59,12 @@ def test_draw_roi_boxes_default_colors():
     cfg = {"a": (10, 10, 30, 30)}
     out = draw_roi_boxes(frame, cfg)
     assert np.any(out > 0), "a red rectangle should have been painted"
+
+
+def test_draw_roi_boxes_missing_color_key_falls_back():
+    """A colors map missing one ROI name must fall back, not raise KeyError."""
+    frame = np.zeros((100, 100, 3), dtype=np.uint8)
+    cfg = {"a": (10, 10, 30, 30), "b": (50, 50, 20, 20)}
+    out = draw_roi_boxes(frame, cfg, {"a": (0, 255, 0)})  # "b" has no color
+    assert out.shape == frame.shape
+    assert np.any(out > 0), "both boxes should still be painted"

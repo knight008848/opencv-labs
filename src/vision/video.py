@@ -83,11 +83,15 @@ def iter_kept_frames(cap: cv2.VideoCapture, src_fps: float, output_fps: float):
     real-time timeline: the k-th kept frame is the source frame closest to
     ``t = k / output_fps`` seconds. This mirrors the day 24 / day 25
     ``next_target = round(saved * ratio)`` grid so output duration matches
-    the source and playback runs at real speed.
+    the source and playback runs at real speed. The grid index is clamped to
+    strictly increase, so upsampling (output_fps > src_fps) yields every
+    source frame instead of stalling.
 
     Streaming by design: frames are yielded one at a time and dropped, so a
     long source never materialises in memory.
     """
+    if src_fps <= 0:
+        raise ValueError(f"src_fps must be positive, got {src_fps}")
     ratio = src_fps / output_fps  # source frames per output frame
     frame_idx = 0
     saved = 0
@@ -100,7 +104,7 @@ def iter_kept_frames(cap: cv2.VideoCapture, src_fps: float, output_fps: float):
             timestamp = frame_idx / src_fps  # real timeline time
             yield frame_idx, frame, timestamp
             saved += 1
-            next_target = round(saved * ratio)
+            next_target = max(next_target + 1, round(saved * ratio))
         frame_idx += 1
 
 

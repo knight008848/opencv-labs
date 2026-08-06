@@ -36,7 +36,8 @@ def define_roi_config(
     ``fractions`` maps roi name -> (x_frac, y_frac, w_frac, h_frac), all in
     [0, 1] relative to the frame. Defaults to the day 26 layout.
     """
-    fractions = fractions or DEFAULT_ROI_FRACTIONS
+    if fractions is None:
+        fractions = DEFAULT_ROI_FRACTIONS
     return {
         name: (
             round(x_frac * width),
@@ -63,19 +64,16 @@ def draw_roi_boxes(
     Draw one labeled rectangle per ROI.
 
     ``colors`` may be a {name: BGR} map or a list used cyclically; if None,
-    a default palette is used. Mutates and returns the input frame.
+    a default palette is used. A map missing an ROI name falls back to the
+    default palette for that ROI. Mutates and returns the input frame.
     """
-    palette = colors if isinstance(colors, list) else None
     for idx, (name, (x, y, w, h)) in enumerate(roi_config.items()):
-        color = (
-            colors[name]
-            if isinstance(colors, dict)
-            else (
-                palette[idx % len(palette)]
-                if palette
-                else DEFAULT_ROI_COLORS[idx % len(DEFAULT_ROI_COLORS)]
-            )
-        )
+        if isinstance(colors, dict):
+            color = colors.get(name) or DEFAULT_ROI_COLORS[idx % len(DEFAULT_ROI_COLORS)]
+        elif isinstance(colors, list):
+            color = colors[idx % len(colors)]
+        else:
+            color = DEFAULT_ROI_COLORS[idx % len(DEFAULT_ROI_COLORS)]
         cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
         cv2.putText(frame, name, (x + 5, y + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
     return frame

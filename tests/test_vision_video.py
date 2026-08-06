@@ -113,8 +113,8 @@ def test_iter_kept_frames_sampling_grid(tmp_path):
         assert frame.shape == (240, 320, 3)
 
 
-def test_iter_kept_frames_empty_tail(tmp_path):
-    """A short clip shorter than one output tick still yields its first frame."""
+def test_iter_kept_frames_upsample_yields_all_frames(tmp_path):
+    """10fps -> 30fps upsample must not stall: every source frame is yielded."""
     path = tmp_path / "v.mp4"
     make_test_video(path, fps=10.0, n_frames=3, width=320, height=240)
     cap = cv2_VideoCapture(path)
@@ -122,7 +122,21 @@ def test_iter_kept_frames_empty_tail(tmp_path):
         kept = list(iter_kept_frames(cap, src_fps=10.0, output_fps=30.0))
     finally:
         cap.release()
-    assert [idx for idx, _, _ in kept] == [0]
+    assert [idx for idx, _, _ in kept] == [0, 1, 2]
+    for idx, _, timestamp in kept:
+        assert timestamp == pytest.approx(idx / 10.0)
+
+
+def test_iter_kept_frames_rejects_nonpositive_fps(tmp_path):
+    """A zero/negative src_fps must fail loudly, not silently stall."""
+    path = tmp_path / "v.mp4"
+    make_test_video(path, fps=10.0, n_frames=3, width=320, height=240)
+    cap = cv2_VideoCapture(path)
+    try:
+        with pytest.raises(ValueError):
+            list(iter_kept_frames(cap, src_fps=0.0, output_fps=30.0))
+    finally:
+        cap.release()
 
 
 # ──────────────────── annotate_frame ────────────────────
