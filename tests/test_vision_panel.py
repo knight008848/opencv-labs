@@ -72,3 +72,23 @@ def test_stack_panels_empty_raises():
         pass
     else:
         raise AssertionError("empty panel list should raise ValueError")
+
+
+def test_day27_render_frame():
+    import importlib.util
+    from pathlib import Path
+    import cv2
+    root = Path(__file__).resolve().parent.parent
+    d27_path = root / "experiments" / "day_27_pipeline.py"
+    spec = importlib.util.spec_from_file_location("day_27_pipeline", d27_path)
+    D27 = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(D27)
+
+    frame = np.zeros((200, 200, 3), dtype=np.uint8)
+    roi_config = {"test_roi": (10, 10, 50, 50)}
+    roi_objects = {"test_roi": [{"bbox": (0, 0, 10, 10), "centroid": (5, 5), "area": 100.0, "id": 1}]}
+    state = {"test_roi": {"trails": {1: [(5, 5)]}, "timeline": {}}}
+    roi_colors = {"test_roi": (0, 255, 0)}
+    
+    out_frame = D27.render_frame(frame, roi_config, roi_objects, state, roi_colors)
+    assert out_frame.shape == frame.shape
