@@ -67,7 +67,7 @@ VIDEO_PATH = PROJECT_DIR / "data" / "raw" / "滚动球.mp4"  # adjust if needed
 
 FRAME_STEP = 5  # keep every N-th frame (configurable, default 5)
 MIN_AREA_FRACTION = 0.003  # blobs >= this fraction of the ROI area survive
-CLOSE_KERNEL = 15  # HSV mask: close gaps so the ball is one solid blob
+CLOSE_KERNEL = 51  # HSV mask: close gaps so the ball is one solid blob
 OPEN_KERNEL = 3  # HSV mask: drop isolated salt noise
 MAX_MATCH_DIST = 250  # centroids closer than this are the same object (px)
 TRAIL_LENGTH = 30  # keep the last N centroid points per tracked object

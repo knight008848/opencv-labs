@@ -46,7 +46,7 @@ ROI_NAME = "panorama"
 FRAME_STEP = 5
 
 # Baseline config currently used by the pipeline
-CUR_CLOSE = 15
+CUR_CLOSE = 51
 CUR_OPEN = 3
 CUR_MIN_FRAC = 0.003
 CUR_MAX_DIST = 250
