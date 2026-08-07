@@ -219,9 +219,9 @@ def write_summary(
     #   - per ROI, sort timeline items and format "trail X: frames A -> B"
     lines = []
     total_objects = sum(len(st["timeline"]) for st in state.values())
-    lines.append(f"Total sampled frames: {meta['total_frames'] // frame_step}")
+    lines.append(f"Total sampled frames: {meta['frame_count'] // frame_step}")
     lines.append(f"Total objects: {total_objects}")
-    for name in roi_names:
+    for name in state:
         lines.append(f"{name}: {len(state[name]['timeline'])} trails")
         for trail_id, timeline in sorted(state[name]["timeline"].items()):
             lines.append(f"trail {trail_id}: frames {timeline['first']} -> {timeline['last']}")
