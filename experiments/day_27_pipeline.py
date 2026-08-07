@@ -164,7 +164,11 @@ def update_timeline(
     #           timeline[trail_id] = {"first": frame_idx, "last": frame_idx}
     #       else:
     #           timeline[trail_id]["last"] = frame_idx
-    raise NotImplementedError("fill in update_timeline")
+    for trail_id in trails:
+        if trail_id not in timeline:
+            timeline[trail_id] = {"first": frame_idx, "last": frame_idx}
+        else:
+            timeline[trail_id]["last"] = frame_idx
 
 
 # ──────────────── Stage 4: Structured outputs ────────────────────
@@ -187,7 +191,16 @@ def pack_features(
     #   arr = np.full((n_frames, max_objs, 6), np.nan)
     #   for i, vecs in enumerate(frame_lists):
     #       arr[i, :len(vecs)] = vecs; counts[i] = len(vecs)
-    raise NotImplementedError("fill in pack_features")
+    for name in roi_names:
+        max_objs = max(len(v) for v in all_features[name])
+        arr = np.full((n_frames, max_objs, 6), np.nan)
+        counts = np.zeros(n_frames, dtype=np.int32)
+        for i, vecs in enumerate(all_features[name]):
+            arr[i, :len(vecs)] = vecs; counts[i] = len(vecs)
+        all_features[name] = arr
+        all_features[f"{name}_counts"] = counts
+
+    return all_features
 
 
 def write_summary(
@@ -204,7 +217,17 @@ def write_summary(
     # Hint: build a list of lines, then write "\n".join(lines).
     #   - total objects = sum(len(st["timeline"]) for st in state.values())
     #   - per ROI, sort timeline items and format "trail X: frames A -> B"
-    raise NotImplementedError("fill in write_summary")
+    lines = []
+    total_objects = sum(len(st["timeline"]) for st in state.values())
+    lines.append(f"Total sampled frames: {meta['total_frames'] // frame_step}")
+    lines.append(f"Total objects: {total_objects}")
+    for name in roi_names:
+        lines.append(f"{name}: {len(state[name]['timeline'])} trails")
+        for trail_id, timeline in sorted(state[name]["timeline"].items()):
+            lines.append(f"trail {trail_id}: frames {timeline['first']} -> {timeline['last']}")
+    with summary_path.open("w") as f:
+        f.write("\n".join(lines))
+
 
 
 # ──────────────────────────── Main ──────────────────────────────
