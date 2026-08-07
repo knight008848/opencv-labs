@@ -48,8 +48,8 @@ FRAME_STEP = 5
 # Baseline config currently used by the pipeline
 CUR_CLOSE = 15
 CUR_OPEN = 3
-CUR_MIN_FRAC = 0.0015
-CUR_MAX_DIST = 50
+CUR_MIN_FRAC = 0.003
+CUR_MAX_DIST = 250
 CUR_MAX_LEN = 30
 
 
