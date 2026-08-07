@@ -663,6 +663,22 @@ Week 4 进阶+项目:    5/9 天  (含 Day 29-30 项目冲刺)
 
 ---
 
+## Day 27 数据管道 + 检测碎片化调参（2026-08-06/07）
+
+- [x] 管道三阶段实现：`update_timeline` / `pack_features` / `write_summary`（`experiments/day_27_pipeline.py`）
+- [x] 端到端跑通：`output.json` + `features.npz` + `summary.txt` + `day_27_annotated.mp4`（138 采样帧 / 7.6s）
+- [x] 修复 `write_summary`：`meta['total_frames']`→`frame_count`、`roi_names`→`state` 迭代
+- [x] 修复 `pack_features`：空检测帧 NaN 填充守卫（广播 `(0,)`→`(0,6)` 崩溃）
+- [x] 碎片化诊断（`day_27_tune_diagnose.py`）：panorama 轨迹 108 → 21（-81%），总物体 174 → 37
+  - **根因 1**：`max_dist=50` 远小于球帧间位移 p95≈508px → 轨迹每帧断裂（`50→250`）
+  - **根因 2**：`close=15` 不足，球在运动模糊下分裂 → 轨迹断（`15→51`，主球轨迹最长 47 点≈7.7s 连续）
+  - **非根因**：场景无静态红物（曾误判为 7 个，实为球的路径格）；HSV 色相无法分离球与背景（二者色带重合）
+  - **无效杠杆**：grace 期（断裂多为长间隔）、motion 门控（无静止物可滤）、frame_step<5（采样越密闪烁越多）
+- [x] 参数终态：`FRAME_STEP=5 / CLOSE=51 / OPEN=3 / MIN_AREA_FRACTION=0.003 / MAX_MATCH_DIST=250`
+- [x] 残留 21 条 = 球自然分段（10）+ 阈值边界闪烁（11），属 HSV 检测固有上限
+
+---
+
 ## 下一步计划
 
 - [x] Day 14: 阶段测试 2 — 87% (8.7/10)
@@ -680,7 +696,7 @@ Week 4 进阶+项目:    5/9 天  (含 Day 29-30 项目冲刺)
 - [x] Day 24: 模块 11 概念 A — 视频 I/O（VideoCapture / VideoWriter + 单趟抽帧标注组装）
 - [x] Day 25: 模块 11 概念 B — 帧差法运动检测 + 背景减除（素材体检 + MOG2 追踪 + 4 bug 修复 + 5-10s 参数调优 mean 4.2→1.0）
 - [x] Day 26: 模块 12 概念 A+B — 多 ROI 分析 + 数据打包
-- [ ] Day 27: 数据管道 v0.1 — 帧提取 → ROI 分窗 → 特征提取 → JSON/NPZ 输出
+- [x] Day 27: 数据管道 v0.1 — 帧提取 → ROI 分窗 → 特征提取 → JSON/NPZ 输出
 - [ ] Day 28: 阶段测试 4（模块 10-12 综合）+ 项目框架搭建
 - [ ] Day 29: 项目冲刺 — 全流程整合 + 真实视频验证
 - [ ] Day 30: 项目完善 + 演示视频录制
