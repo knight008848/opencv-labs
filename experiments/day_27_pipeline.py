@@ -196,7 +196,10 @@ def pack_features(
         arr = np.full((n_frames, max_objs, 6), np.nan)
         counts = np.zeros(n_frames, dtype=np.int32)
         for i, vecs in enumerate(all_features[name]):
-            arr[i, :len(vecs)] = vecs; counts[i] = len(vecs)
+            n = len(vecs)          # 先把长度取出来，算一次
+            if n:                  # 只有有物体时才填数据
+                arr[i, :n] = vecs
+            counts[i] = n          # 无论有没有，计数都要记（0 也算一种结果）
         all_features[name] = arr
         all_features[f"{name}_counts"] = counts
 
